@@ -36,7 +36,7 @@ const ProfileSettings = () => {
     const EmailHelper = getAngularService('EmailHelper');
     const ControlCollectionHelper = getAngularService('ControlCollectionHelper');
     const ControlSyncHelper = getAngularService('ControlSyncHelper');
-    const CalorieCal = getAngularService('CalorieCal');
+    // const CalorieCal = getAngularService('CalorieCal');
     const KVStore = getAngularService('KVStore');
     const NotificationScheduler = getAngularService('NotificationScheduler');
 
