@@ -113,7 +113,9 @@ const ProfileSettings = () => {
             const n = moment(newNotificationSettings.prefReminderTimeVal);
             newNotificationSettings.prefReminderTime = n.format('LT');
             newNotificationSettings.prefReminderTimeOnLoad = prefs.reminder_time_of_day;
-            newNotificationSettings.scheduledNotifs = NotificationScheduler.scheduledNotifs;
+            const schedule = await NotificationScheduler.getScheduledNotifs();
+            console.log("notifs", schedule);
+            newNotificationSettings.scheduledNotifs = schedule;
             updatePrefReminderTime(false);
         }
 

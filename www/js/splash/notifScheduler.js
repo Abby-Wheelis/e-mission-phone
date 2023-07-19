@@ -79,6 +79,45 @@ angular.module('emission.splash.notifscheduler',
         });
     }
 
+    //new method to fetch notifications
+    scheduler.getScheduledNotifs = async() => {
+        if(isScheduling)
+        {
+            console.log("still actively scheduling"); //often even still scheduling
+        }
+        const notifs = await getNotifs();
+        const schedule = await createSchedule(notifs);
+        console.log("is the schedule there?", schedule);
+        return schedule;
+    }
+
+    //new function just to get the scheduled notifications
+    const getNotifs = function() {
+
+        return new Promise((resolve, reject) => {
+            cordova.plugins.notification.local.getScheduled((notifs) => {
+                if (!notifs?.length)
+                    console.log("there are no notifications");
+                console.log("here are the notifs?", notifs);
+                resolve(notifs);
+             });
+        })
+    }
+
+    const createSchedule = function(notifs) {
+        let scheduledNotifs = [];
+        scheduledNotifs = notifs.map((n) => {
+            const time = moment(n.trigger.at).format('LT');
+            const date = moment(n.trigger.at).format('LL');
+            return {
+                key: date,
+                val: time
+            }
+        });
+        console.log("ready to return", scheduledNotifs);
+        return scheduledNotifs;
+    }
+
     // schedules the notifications using the cordova plugin
     const scheduleNotifs = (scheme, notifTimes) => {
         return new Promise((rs) => {
@@ -174,6 +213,7 @@ angular.module('emission.splash.notifscheduler',
         return { ...user, ...initPrefs }; // user profile + the new prefs
     }
 
+    //this doesn't finish scheduling before it returns :(
     scheduler.setReminderPrefs = async (newPrefs) => {
         await CommHelper.updateUser(newPrefs);
         update();
