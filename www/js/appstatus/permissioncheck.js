@@ -412,7 +412,7 @@ controller("PermissionCheckControl", function($scope, $element, $attrs,
     });
 
     $scope.$on("recomputeAppStatus", function(e, callback) {
-        console.log("PERMISSION CHECK: recomputing state");
+        console.log("PERMISSION CHECK: recomputing state", callback);
         Promise.all([
             refreshChecks($scope.locChecks, $scope.recomputeLocStatus),
             refreshChecks($scope.fitnessChecks, $scope.recomputeFitnessStatus),
