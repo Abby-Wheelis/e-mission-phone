@@ -6,6 +6,8 @@ import { Dialog, Button, Text, useTheme } from 'react-native-paper';
 import { useTranslation } from "react-i18next";
 import { getAngularService } from "../angular-react-helper";
 import PermissionItem from "../appstatus/PermissionItem";
+import useAppConfig from "../useAppConfig";
+import ExplainPermissions from "../appstatus/ExplainPermissions";
 
 const AppStatusModal = ({permitVis, setPermitVis, status, dialogStyle}) => {
     const { t } = useTranslation();
@@ -21,6 +23,7 @@ const AppStatusModal = ({permitVis, setPermitVis, status, dialogStyle}) => {
     const notifPress = () => setNotifExpanded(!notifExpanded);
     const [backgroundExpanded, setBackgroundExpanded] = React.useState(false);
     const backgroundPress = () => setBackgroundExpanded(!backgroundExpanded);
+    const [explainVis, setExplainVis] = useState(false);
 
     const $ionicPlatform = getAngularService('$ionicPlatform');
 
@@ -38,6 +41,8 @@ const AppStatusModal = ({permitVis, setPermitVis, status, dialogStyle}) => {
     const [locationPermExplanation, setLocationPermExplanation] = useState("");
 
     const [checkList, setCheckList] = useState([]);
+    const [explanationList, setExplanationList] = useState([]);
+    const [haveSetText, setHaveSetText] = useState(false);
 
     const mainControlEl = document.getElementById('main-control').querySelector('ion-view');
     const settingsScope = angular.element(mainControlEl).scope();
@@ -46,8 +51,17 @@ const AppStatusModal = ({permitVis, setPermitVis, status, dialogStyle}) => {
     //load when ready
     useEffect(() => {
         if (appConfig) {
+            setPlatform(window.device.platform.toLowerCase());
+            setOsver(window.device.version.split(".")[0]);
+
+            if(!haveSetText)
+            {
+                setupPermissionText();
+                setHaveSetText(true);
+            }
+
             console.log("setting up permissions");
-            setUpPermissions();
+            createChecklist();
         }
     }, [appConfig]);
 
@@ -318,13 +332,24 @@ const AppStatusModal = ({permitVis, setPermitVis, status, dialogStyle}) => {
     }
 
     function setupPermissionText() {
-        if(platform.toLowerCase() == "ios") {
-          if(osver < 13) {
-            setLocationPermExplanation(t("intro.permissions.locationPermExplanation-ios-lt-13"));
-          } else {
-            setLocationPermExplanation(t("intro.permissions.locationPermExplanation-ios-gte-13"));
-          }
+        let tempExplanations = explanationList;
+
+        let overallFitnessName = t('intro.appstatus.overall-fitness-name-android');
+        let locExplanation = t('intro.appstatus.overall-loc-description');
+        if(platform == "ios") {
+            overallFitnessName = t('intro.appstatus.overall-fitness-name-ios');
+            if(osver < 13) {
+                locExplanation = (t("intro.permissions.locationPermExplanation-ios-lt-13"));
+            } else {
+                locExplanation = (t("intro.permissions.locationPermExplanation-ios-gte-13"));
+            }
         }
+        tempExplanations.push({name: t('intro.appstatus.overall-loc-name'), desc: locExplanation});
+        tempExplanations.push({name: overallFitnessName, desc: t('intro.appstatus.overall-fitness-description')});
+        tempExplanations.push({name: t('intro.appstatus.overall-notification-name'), desc: t('intro.appstatus.overall-notification-description')});
+        tempExplanations.push({name: t('intro.appstatus.overall-background-restrictions-name'), desc: t('intro.appstatus.overall-background-restrictions-description')});
+
+        setExplanationList(tempExplanations);
   
         setBackgroundRestricted(false);
         if(window.device.manufacturer.toLowerCase() == "samsung") {
@@ -332,7 +357,7 @@ const AppStatusModal = ({permitVis, setPermitVis, status, dialogStyle}) => {
           setAllowBackgroundInstructions(t("intro.allow_background.samsung"));
         }
   
-        console.log("Explanation = "+locationPermExplanation);
+        console.log("Explanation = "+explanationList);
     }
 
     function checkLocationServicesEnabled() {
