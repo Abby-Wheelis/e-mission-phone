@@ -213,7 +213,6 @@ angular.module('emission.main.control',['emission.services',
     $scope.showLog = function() {
         $state.go("root.main.log");
     }
-    //inProfileSettings in DevZone
     $scope.showSensed = function() {
         $state.go("root.main.sensed");
     }
