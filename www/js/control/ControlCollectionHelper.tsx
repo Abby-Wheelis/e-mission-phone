@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Modal, View } from "react-native";
 import { Dialog, Button, Switch, Text, useTheme, TextInput } from 'react-native-paper';
-import { useTranslation } from "react-i18next";
 import ActionMenu from "../components/ActionMenu";
 import { settingStyles } from "./ProfileSettings";
 import { getAngularService } from "../angular-react-helper";
@@ -131,7 +130,7 @@ const formatConfigForDisplay = function(config, accuracyOptions) {
     return retVal;
 }
 
-const ControlSyncHelper = ({ editVis, setEditVis }) => {
+const ControlCollectionHelper = ({ editVis, setEditVis }) => {
     const {colors} = useTheme();
     const Logger = getAngularService("Logger");
 
@@ -281,4 +280,4 @@ const ControlSyncHelper = ({ editVis, setEditVis }) => {
     );
   };
   
-export default ControlSyncHelper;
+export default ControlCollectionHelper;
