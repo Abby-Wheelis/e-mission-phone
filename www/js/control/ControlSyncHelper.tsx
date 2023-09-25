@@ -213,7 +213,6 @@ const ControlSyncHelper = ({ editVis, setEditVis }) => {
         console.log("new config = "+localConfig);
         try{
             let set = setConfig(localConfig);
-            //NOTE -- we need to make sure we update these settings in ProfileSettings :) -- getting rid of broadcast handling for migration!!
             CommHelper.updateUser({
                 // TODO: worth thinking about where best to set this
                 // Currently happens in native code. Now that we are switching
