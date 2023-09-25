@@ -38,7 +38,7 @@ const ProfileSettings = () => {
     const StartPrefs = getAngularService('StartPrefs');
     const DynamicConfig = getAngularService('DynamicConfig');
 
-    //functions that come directly from an Angular service
+    //functions to open edit windows for collection and sync configs
     const editCollectionConfig = () => setEditCollection(true);
     const editSyncConfig = () => setEditSync(true);
 
