@@ -37,15 +37,6 @@ export async function getHelperSyncSettings() {
     return formatConfigForDisplay(tempConfig);
 }
 
-const getEndTransitionKey = function() {
-    if(window.cordova.platformId == 'android') {
-        return "local.transition.stopped_moving";
-    }
-    else if(window.cordova.platformId == 'ios') {
-        return "T_TRIP_ENDED";
-    }
-}
-
 type syncConfig = { sync_interval: number, 
                     ios_use_remote_push: boolean };
 
