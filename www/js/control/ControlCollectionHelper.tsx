@@ -87,7 +87,7 @@ export async function helperToggleLowAccuracy() {
 */
 
 export const getState = function() {
-    return window.cordova.plugins.BEMDataCollection.getState();
+    return window['cordova'].plugins.BEMDataCollection.getState();
 };
 
 export async function getHelperCollectionSettings() {
@@ -101,18 +101,18 @@ export async function getHelperCollectionSettings() {
 }
 
 const setConfig = function(config) {
-    return window.cordova.plugins.BEMDataCollection.setConfig(config);
+    return window['cordova'].plugins.BEMDataCollection.setConfig(config);
 };
 
 const getConfig = function() {
-    return window.cordova.plugins.BEMDataCollection.getConfig();
+    return window['cordova'].plugins.BEMDataCollection.getConfig();
 };
 const getAccuracyOptions = function() {
-    return window.cordova.plugins.BEMDataCollection.getAccuracyOptions();
+    return window['cordova'].plugins.BEMDataCollection.getAccuracyOptions();
 };
 
 export const forceTransitionWrapper = function(transition) {
-    return window.cordova.plugins.BEMDataCollection.forceTransition(transition);
+    return window['cordova'].plugins.BEMDataCollection.forceTransition(transition);
 };
 
 const formatConfigForDisplay = function(config, accuracyOptions) {
