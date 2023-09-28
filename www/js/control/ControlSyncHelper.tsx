@@ -88,28 +88,28 @@ export const ForceSyncRow = ({getState}) => {
     };
 
     const getStartTransitionKey = function() {
-        if(window.cordova.platformId == 'android') {
+        if(window['cordova'].platformId.toLowerCase() == 'android') {
             return "local.transition.exited_geofence";
         }
-        else if(window.cordova.platformId == 'ios') {
+        else if(window['cordova'].platformId.toLowerCase() == 'ios') {
             return "T_EXITED_GEOFENCE";
         }
     }
 
     const getEndTransitionKey = function() {
-        if(window.cordova.platformId == 'android') {
+        if(window['cordova'].platformId.toLowerCase() == 'android') {
             return "local.transition.stopped_moving";
         }
-        else if(window.cordova.platformId == 'ios') {
+        else if(window['cordova'].platformId.toLowerCase() == 'ios') {
             return "T_TRIP_ENDED";
         }
     }
 
     const getOngoingTransitionState = function() {
-        if(window.cordova.platformId == 'android') {
+        if(window['cordova'].platformId.toLowerCase() == 'android') {
             return "local.state.ongoing_trip";
         }
-        else if(window.cordova.platformId == 'ios') {
+        else if(window['cordova'].platformId.toLowerCase() == 'ios') {
             return "STATE_ONGOING_TRIP";
         }
     }

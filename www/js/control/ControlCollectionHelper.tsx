@@ -46,9 +46,9 @@ export async function isMediumAccuracy() {
         return undefined; // config not loaded when loading ui, set default as false
     } else {
         var v = await accuracy2String(config);
-        if (window.cordova.platformId == 'ios') {
+        if (window['cordova'].platformId.toLowerCase() == 'ios') {
             return v != "kCLLocationAccuracyBestForNavigation" && v != "kCLLocationAccuracyBest" && v != "kCLLocationAccuracyTenMeters";
-        } else if (window.cordova.platformId == 'android') {
+        } else if (window['cordova'].platformId.toLowerCase() == 'android') {
             return v != "PRIORITY_HIGH_ACCURACY";
         } else {
             window.alert("Emission does not support this platform");
@@ -62,15 +62,15 @@ export async function helperToggleLowAccuracy() {
     let accuracyOptions = await getAccuracyOptions();
     let medium = await isMediumAccuracy();
     if (medium) {
-        if (window.cordova.platformId == 'ios') {
+        if (window['cordova'].platformId.toLowerCase() == 'ios') {
             tempConfig.accuracy = accuracyOptions["kCLLocationAccuracyBest"];
-        } else if (window.cordova.platformId == 'android') {
-            tempConfig.accuracy = cch.accuracyOptions["PRIORITY_HIGH_ACCURACY"];
+        } else if (window['cordova'].platformId.toLowerCase() == 'android') {
+            tempConfig.accuracy = accuracyOptions["PRIORITY_HIGH_ACCURACY"];
         }
     } else {
-        if (window.cordova.platformId == 'ios') {
+        if (window['cordova'].platformId.toLowerCase() == 'ios') {
             tempConfig.accuracy = accuracyOptions["kCLLocationAccuracyHundredMeters"];
-        } else if (window.cordova.platformId == 'android') {
+        } else if (window['cordova'].platformId.toLowerCase() == 'android') {
             tempConfig.accuracy = accuracyOptions["PRIORITY_BALANCED_POWER_ACCURACY"];
         }
     }
@@ -197,10 +197,9 @@ const ControlSyncHelper = ({ editVis, setEditVis }) => {
 
     /*ios vs android*/
     let filterComponent;
-    if(window.cordova.platformId == 'ios') {
+    if(window['cordova'].platformId.toLowerCase() == 'ios') {
         filterComponent = <View style={{ paddingHorizontal: 15, flexDirection: 'row', justifyContent: 'space-between' }}>
                             <Text variant="labelMedium">Filter Distance</Text>
-                            <TextInput label="Filter Distance" value={localConfig?.filter_distance?.toString()} onChangeText={text => onChangeText(text, "filter_distance")}/>
                          </View>
     } else {
         filterComponent = <View style={{ paddingHorizontal: 15, flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -209,7 +208,7 @@ const ControlSyncHelper = ({ editVis, setEditVis }) => {
                         </View>
     }
     let iosToggles;
-    if(window.cordova.platformId == 'ios') {
+    if(window['cordova'].platformId.toLowerCase() == 'ios') {
         iosToggles = <>
         {/* use visit notifications toggle NO ANDROID */}
         <View style={{ paddingHorizontal: 15, flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -224,7 +223,7 @@ const ControlSyncHelper = ({ editVis, setEditVis }) => {
         </>
     }
     let geofenceComponent;
-    if(window.cordova.platformId == 'android') {
+    if(window['cordova'].platformId.toLowerCase() == 'android') {
         geofenceComponent = <View style={{ paddingHorizontal: 15, flexDirection: 'row', justifyContent: 'space-between' }}>
                                 <Text variant="labelMedium">Geofence Responsiveness</Text>
                                 <TextInput label="Geofence Responsiveness" value={localConfig?.android_geofence_responsiveness?.toString()} onChangeText={text => onChangeText(text, "android_geofence_responsiveness")}/>
