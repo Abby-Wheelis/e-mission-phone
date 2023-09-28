@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Modal, View } from "react-native";
+import { Modal, View, StyleSheet } from "react-native";
 import { Dialog, Button, Switch, Text, useTheme, TextInput } from 'react-native-paper';
 import { useTranslation } from "react-i18next";
 import ActionMenu from "../components/ActionMenu";
@@ -200,11 +200,12 @@ const ControlSyncHelper = ({ editVis, setEditVis }) => {
     if(window['cordova'].platformId.toLowerCase() == 'ios') {
         filterComponent = <View style={{ paddingHorizontal: 15, flexDirection: 'row', justifyContent: 'space-between' }}>
                             <Text variant="labelMedium">Filter Distance</Text>
+                            <TextInput style={styles.input} label="Filter Distance" value={localConfig?.filter_distance?.toString()} onChangeText={text => onChangeText(text, "filter_distance")}/>
                          </View>
     } else {
         filterComponent = <View style={{ paddingHorizontal: 15, flexDirection: 'row', justifyContent: 'space-between' }}>
                             <Text variant="labelMedium">Filter Interval</Text>
-                            <TextInput label="Filter Interval" value={localConfig?.filter_time?.toString()} onChangeText={text => onChangeText(text, "filter_time")}/>
+                            <TextInput style={styles.input} label="Filter Interval" value={localConfig?.filter_time?.toString()} onChangeText={text => onChangeText(text, "filter_time")}/>
                         </View>
     }
     let iosToggles;
@@ -226,7 +227,7 @@ const ControlSyncHelper = ({ editVis, setEditVis }) => {
     if(window['cordova'].platformId.toLowerCase() == 'android') {
         geofenceComponent = <View style={{ paddingHorizontal: 15, flexDirection: 'row', justifyContent: 'space-between' }}>
                                 <Text variant="labelMedium">Geofence Responsiveness</Text>
-                                <TextInput label="Geofence Responsiveness" value={localConfig?.android_geofence_responsiveness?.toString()} onChangeText={text => onChangeText(text, "android_geofence_responsiveness")}/>
+                                <TextInput style={styles.input} label="Geofence Responsiveness" value={localConfig?.android_geofence_responsiveness?.toString()} onChangeText={text => onChangeText(text, "android_geofence_responsiveness")}/>
                             </View>
     }
 
@@ -260,7 +261,7 @@ const ControlSyncHelper = ({ editVis, setEditVis }) => {
                         {/* geofence radius */}
                         <View style={{ paddingHorizontal: 15, flexDirection: 'row', justifyContent: 'space-between' }}>
                             <Text variant="labelMedium">Geofence Radius</Text>
-                            <TextInput label="Geofence Radius" value={localConfig?.geofence_radius?.toString()} onChangeText={text => onChangeText(text, "geofence_radius")}/>
+                            <TextInput style={styles.input} label="Geofence Radius" value={localConfig?.geofence_radius?.toString()} onChangeText={text => onChangeText(text, "geofence_radius")}/>
                         </View>
                         {iosToggles}
                         {geofenceComponent}
@@ -279,5 +280,13 @@ const ControlSyncHelper = ({ editVis, setEditVis }) => {
         </>
     );
   };
+
+  const styles = StyleSheet.create({
+    input: {
+        fontSize: 12,
+        paddingHorizontal: 3,
+        height: 40
+    },
+  });
   
 export default ControlSyncHelper;
