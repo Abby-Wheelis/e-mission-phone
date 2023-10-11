@@ -58,7 +58,7 @@ const usePermissionStatus = () => {
     }
 
     async function checkOrFix(checkObj, nativeFn, showError=true) {
-        console.log("checking object", checkObj.name, checkObj);
+        console.debug("checking object", checkObj.name, " with method ", nativeFn.name);
         let newCheck = checkObj;
         return nativeFn()
             .then((status) => {
@@ -227,12 +227,12 @@ const usePermissionStatus = () => {
 
     function setupAndroidNotificationChecks() {
         let fixPerms = function() {
-            console.log("fix and refresh notification permissions");
-            return checkOrFix(appAndChannelNotificationsCheck, window['cordova'].plugins.BEMDataCollection.fixShowNotifications,
+            console.log("FIX and refresh notification permissions");
+            return checkOrFix(appAndChannelNotificationsCheck, window['cordova'].plugins.BEMDataCollection.isValidShowNotifications,
                 true);
         };
         let checkPerms = function() {
-            console.log("fix and refresh notification permissions");
+            console.log("CHECK and refresh notification permissions");
             return checkOrFix(appAndChannelNotificationsCheck, window['cordova'].plugins.BEMDataCollection.isValidShowNotifications,
                 false);
         };
