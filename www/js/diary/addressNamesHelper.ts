@@ -58,7 +58,7 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
 
   LocalStorageObserver.subscribe(key, setStoredValue);
 
-  const setValue = (value: T) => {
+  function setValue(value: T) {
     try {
       const valueToStore = value instanceof Function ? value(storedValue) : value;
       setStoredValue(valueToStore);
@@ -67,14 +67,15 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
         window.localStorage.setItem(key, JSON.stringify(valueToStore));
       }
     } catch (error) {
-      console.error(error);
+      displayError(error);
     }
-  };
+  }
   return [storedValue, setValue];
 }
 
 import Bottleneck from 'bottleneck';
 import { displayError, logDebug } from '../plugin/logger';
+import { CompositeTrip } from '../types/diaryTypes';
 
 let nominatimLimiter = new Bottleneck({ maxConcurrent: 2, minTime: 500 });
 export const resetNominatimLimiter = () => {
@@ -110,15 +111,10 @@ async function fetchNominatimLocName(loc_geojson) {
   const coordsStr = loc_geojson.coordinates.toString();
   const cachedResponse = localStorage.getItem(coordsStr);
   if (cachedResponse) {
-    console.log(
-      'fetchNominatimLocName: found cached response for ',
-      coordsStr,
-      cachedResponse,
-      'skipping fetch',
-    );
+    logDebug(`fetchNominatimLocName: found cached response for ${coordsStr}`);
     return;
   }
-  console.log('Getting location name for ', coordsStr);
+  logDebug('Getting location name for ' + JSON.stringify(coordsStr));
   const url =
     'https://nominatim.openstreetmap.org/reverse?format=json&lat=' +
     loc_geojson.coordinates[1] +
@@ -141,7 +137,7 @@ async function fetchNominatimLocName(loc_geojson) {
 }
 
 // Schedules nominatim fetches for the start and end locations of a trip
-export function fillLocationNamesOfTrip(trip) {
+export function fillLocationNamesOfTrip(trip: CompositeTrip) {
   nominatimLimiter.schedule(() => fetchNominatimLocName(trip.end_loc));
   nominatimLimiter.schedule(() => fetchNominatimLocName(trip.start_loc));
 }

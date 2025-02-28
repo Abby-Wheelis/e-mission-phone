@@ -1,16 +1,22 @@
 import { useEffect, useState, useMemo } from 'react';
-import useAppStateChange from './useAppStateChange';
+import useAppState from './useAppState';
 import useAppConfig from './useAppConfig';
 import { useTranslation } from 'react-i18next';
 import { useAppTheme } from './appTheme';
+import { logDebug, logWarn } from './plugin/logger';
+import { AlertManager } from './components/AlertBar';
+import { readConsented } from './onboarding/onboardingHelper';
 
-//refreshing checks with the plugins to update the check's statusState
+let DEVICE_PLATFORM: 'android' | 'ios';
+let DEVICE_VERSION: number;
+
+//refreshing checks with the plugins to update the check's status
 export function refreshAllChecks(checkList) {
   //refresh each check
   checkList.forEach((lc) => {
     lc.refresh();
   });
-  console.log('setting checks are', checkList);
+  logDebug('After refreshing all checks, checks are ' + JSON.stringify(checkList));
 }
 
 type Check = {
@@ -18,98 +24,97 @@ type Check = {
   desc: string;
   fix: () => Promise<any>;
   refresh: () => Promise<any>;
-  statusState?: boolean;
-  statusIcon?: string;
-  statusColor?: string;
+  status?: boolean;
+  isOptional?: boolean;
+  wasRequested?: boolean;
 };
 
 const usePermissionStatus = () => {
   const { t } = useTranslation();
-  const { colors } = useAppTheme();
   const appConfig = useAppConfig();
-
-  const [error, setError] = useState<string>('');
-  const [errorVis, setErrorVis] = useState<boolean>(false);
 
   const [checkList, setCheckList] = useState<Check[]>([]);
   const [explanationList, setExplanationList] = useState<Array<any>>([]);
-  const [haveSetText, setHaveSetText] = useState<boolean>(false);
-
-  let iconMap = (statusState) => (statusState ? 'check-circle-outline' : 'alpha-x-circle-outline');
-  let colorMap = (statusState) => (statusState ? colors.success : colors.danger);
 
   const overallStatus = useMemo<boolean | undefined>(() => {
-    let status = true;
     if (!checkList?.length) return undefined; // if checks not loaded yet, status is undetermined
-    checkList.forEach((lc) => {
-      console.debug('check in permission status for ' + lc.name + ':', lc.statusState);
-      if (lc.statusState === false) {
-        status = false;
-      }
-    });
-    return status;
+    return checkList.every((check) => check.status || (check.isOptional && check.wasRequested));
   }, [checkList]);
 
   //using this function to update checks rather than mutate
   //this cues React to update UI
-  function updateCheck(newObject) {
-    var tempList = [...checkList]; //make a copy rather than mutate
-    //update the visiblility pieces here, rather than mutating
-    newObject.statusIcon = iconMap(newObject.statusState);
-    newObject.statusColor = colorMap(newObject.statusState);
+  function updateCheck(newCheck) {
+    const tempList = [...checkList];
     //"find and replace" the check
-    tempList.forEach((item, i) => {
-      if (item.name == newObject.name) {
-        tempList[i] = newObject;
-      }
-    });
+    const i = tempList.findIndex((item) => item.name == newCheck.name);
+    tempList[i] = newCheck;
     setCheckList(tempList);
   }
 
   async function checkOrFix(checkObj, nativeFn, showError = true) {
-    console.log('checking object', checkObj.name, checkObj);
+    logDebug('checking object ' + checkObj.name + ' ' + JSON.stringify(checkObj));
     let newCheck = checkObj;
-    return nativeFn()
-      .then((status) => {
-        console.log('availability ', status);
-        newCheck.statusState = true;
-        updateCheck(newCheck);
-        console.log('after checking object', checkObj.name, checkList);
-        return status;
-      })
-      .catch((error) => {
-        console.log('Error', error);
-        if (showError) {
-          console.log('please fix again');
-          setError(error);
-          setErrorVis(true);
-        }
-        newCheck.statusState = false;
-        updateCheck(newCheck);
-        console.log('after checking object', checkObj.name, checkList);
-        return error;
-      });
+    try {
+      const status = await nativeFn();
+      logDebug(`${checkObj.name} status = ${status}`);
+      newCheck.status = true;
+      updateCheck(newCheck);
+      return status;
+    } catch (error) {
+      if (showError) {
+        AlertManager.addMessage({ text: error });
+      }
+      newCheck.status = false;
+      updateCheck(newCheck);
+      return error;
+    }
   }
 
-  function setupAndroidLocChecks() {
-    let fixSettings = function () {
-      console.log('Fix and refresh location settings');
+  function getLocSettingsDescriptionTag() {
+    if (DEVICE_PLATFORM == 'android') {
+      return DEVICE_VERSION < 9
+        ? 'intro.appstatus.locsettings.description.android-lt-9'
+        : 'intro.appstatus.locsettings.description.android-gte-9';
+    } else if (DEVICE_PLATFORM == 'ios') {
+      return 'intro.appstatus.locsettings.description.ios';
+    }
+    throw new Error(`Unknown platform ${DEVICE_PLATFORM} – unable to proceed`);
+  }
+
+  function getLocPermissionsDescriptionTag() {
+    if (DEVICE_PLATFORM == 'android') {
+      if (DEVICE_VERSION < 6) return 'intro.appstatus.locperms.description.android-lt-6';
+      if (DEVICE_VERSION < 10) return 'intro.appstatus.locperms.description.android-6-9';
+      if (DEVICE_VERSION < 11) return 'intro.appstatus.locperms.description.android-10';
+      if (DEVICE_VERSION < 12) return 'intro.appstatus.locperms.description.android-11';
+      return 'intro.appstatus.locperms.description.android-gte-12';
+    } else if (DEVICE_PLATFORM == 'ios') {
+      if (DEVICE_VERSION < 13) return 'intro.appstatus.locperms.description.ios-lt-13';
+      if (DEVICE_VERSION < 13.4) return 'intro.appstatus.locperms.description.ios-13-13.3';
+      return 'intro.appstatus.locperms.description.ios-gte-13.4';
+    }
+    throw new Error(`Unknown platform ${DEVICE_PLATFORM} – unable to proceed`);
+  }
+
+  function setupLocChecks() {
+    let fixSettings = () => {
+      logDebug('Fix and refresh location settings');
       return checkOrFix(
         locSettingsCheck,
         window['cordova'].plugins.BEMDataCollection.fixLocationSettings,
         true,
       );
     };
-    let checkSettings = function () {
-      console.log('Refresh location settings');
+    let checkSettings = () => {
+      logDebug('Refresh location settings');
       return checkOrFix(
         locSettingsCheck,
         window['cordova'].plugins.BEMDataCollection.isValidLocationSettings,
         false,
       );
     };
-    let fixPerms = function () {
-      console.log('fix and refresh location permissions');
+    let fixPerms = () => {
+      logDebug('fix and refresh location permissions');
       return checkOrFix(
         locPermissionsCheck,
         window['cordova'].plugins.BEMDataCollection.fixLocationPermissions,
@@ -120,40 +125,25 @@ const usePermissionStatus = () => {
         }
       });
     };
-    let checkPerms = function () {
-      console.log('fix and refresh location permissions');
+    let checkPerms = () => {
+      logDebug('refresh location permissions');
       return checkOrFix(
         locPermissionsCheck,
         window['cordova'].plugins.BEMDataCollection.isValidLocationPermissions,
         false,
       );
     };
-    const androidVersion = window['device'].version.split('.')[0];
-    const androidSettingsDescTag =
-      androidVersion < 9
-        ? 'intro.appstatus.locsettings.description.android-lt-9'
-        : 'intro.appstatus.locsettings.description.android-gte-9';
-    const androidPermDescTag =
-      androidVersion < 6
-        ? 'intro.appstatus.locperms.description.android-lt-6'
-        : androidVersion < 10
-          ? 'intro.appstatus.locperms.description.android-6-9'
-          : androidVersion < 11
-            ? 'intro.appstatus.locperms.description.android-10'
-            : androidVersion < 12
-              ? 'intro.appstatus.locperms.description.android-11'
-              : 'intro.appstatus.locperms.description.android-gte-12';
-    console.log('description tags are ' + androidSettingsDescTag + ' ' + androidPermDescTag);
+
     // location settings
     let locSettingsCheck = {
       name: t('intro.appstatus.locsettings.name'),
-      desc: t(androidSettingsDescTag),
+      desc: t(getLocSettingsDescriptionTag()),
       fix: fixSettings,
       refresh: checkSettings,
     };
     let locPermissionsCheck = {
       name: t('intro.appstatus.locperms.name'),
-      desc: t(androidPermDescTag),
+      desc: t(getLocPermissionsDescriptionTag()),
       fix: fixPerms,
       refresh: checkPerms,
     };
@@ -162,106 +152,14 @@ const usePermissionStatus = () => {
     setCheckList(tempChecks);
   }
 
-  function setupIOSLocChecks() {
-    let fixSettings = function () {
-      console.log('Fix and refresh location settings');
-      return checkOrFix(
-        locSettingsCheck,
-        window['cordova'].plugins.BEMDataCollection.fixLocationSettings,
-        true,
-      );
-    };
-    let checkSettings = function () {
-      console.log('Refresh location settings');
-      return checkOrFix(
-        locSettingsCheck,
-        window['cordova'].plugins.BEMDataCollection.isValidLocationSettings,
-        false,
-      );
-    };
-    let fixPerms = function () {
-      console.log('fix and refresh location permissions');
-      return checkOrFix(
-        locPermissionsCheck,
-        window['cordova'].plugins.BEMDataCollection.fixLocationPermissions,
-        true,
-      ).then((error) => {
-        if (error) {
-          locPermissionsCheck.desc = error;
-        }
-      });
-    };
-    let checkPerms = function () {
-      console.log('fix and refresh location permissions');
-      return checkOrFix(
-        locPermissionsCheck,
-        window['cordova'].plugins.BEMDataCollection.isValidLocationPermissions,
-        false,
-      );
-    };
-    const iOSVersion = window['device'].version.split('.')[0];
-    const iOSSettingsDescTag = 'intro.appstatus.locsettings.description.ios';
-    const iOSPermDescTag =
-      iOSVersion < 13
-        ? 'intro.appstatus.locperms.description.ios-lt-13'
-        : 'intro.appstatus.locperms.description.ios-gte-13';
-    console.log('description tags are ' + iOSSettingsDescTag + ' ' + iOSPermDescTag);
-
-    const locSettingsCheck = {
-      name: t('intro.appstatus.locsettings.name'),
-      desc: t(iOSSettingsDescTag),
-      fix: fixSettings,
-      refresh: checkSettings,
-    };
-    const locPermissionsCheck = {
-      name: t('intro.appstatus.locperms.name'),
-      desc: t(iOSPermDescTag),
-      fix: fixPerms,
-      refresh: checkPerms,
-    };
-    let tempChecks = checkList;
-    tempChecks.push(locSettingsCheck, locPermissionsCheck);
-    setCheckList(tempChecks);
-  }
-
-  function setupAndroidFitnessChecks() {
-    if (window['device'].version.split('.')[0] >= 10) {
-      let fixPerms = function () {
-        console.log('fix and refresh fitness permissions');
-        return checkOrFix(
-          fitnessPermissionsCheck,
-          window['cordova'].plugins.BEMDataCollection.fixFitnessPermissions,
-          true,
-        ).then((error) => {
-          if (error) {
-            fitnessPermissionsCheck.desc = error;
-          }
-        });
-      };
-      let checkPerms = function () {
-        console.log('fix and refresh fitness permissions');
-        return checkOrFix(
-          fitnessPermissionsCheck,
-          window['cordova'].plugins.BEMDataCollection.isValidFitnessPermissions,
-          false,
-        );
-      };
-
-      let fitnessPermissionsCheck = {
-        name: t('intro.appstatus.fitnessperms.name'),
-        desc: t('intro.appstatus.fitnessperms.description.android'),
-        fix: fixPerms,
-        refresh: checkPerms,
-      };
-      let tempChecks = checkList;
-      tempChecks.push(fitnessPermissionsCheck);
-      setCheckList(tempChecks);
+  function setupFitnessChecks() {
+    if (DEVICE_PLATFORM == 'android' && DEVICE_VERSION < 10) {
+      logDebug('Android version < 10, skipping fitness checks');
+      return;
     }
-  }
 
-  function setupIOSFitnessChecks() {
-    let fixPerms = function () {
-      console.log('fix and refresh fitness permissions');
+    let fixPerms = () => {
+      logDebug('fix and refresh fitness permissions');
       return checkOrFix(
         fitnessPermissionsCheck,
         window['cordova'].plugins.BEMDataCollection.fixFitnessPermissions,
@@ -272,8 +170,8 @@ const usePermissionStatus = () => {
         }
       });
     };
-    let checkPerms = function () {
-      console.log('fix and refresh fitness permissions');
+    let checkPerms = () => {
+      logDebug('refresh fitness permissions');
       return checkOrFix(
         fitnessPermissionsCheck,
         window['cordova'].plugins.BEMDataCollection.isValidFitnessPermissions,
@@ -283,7 +181,7 @@ const usePermissionStatus = () => {
 
     let fitnessPermissionsCheck = {
       name: t('intro.appstatus.fitnessperms.name'),
-      desc: t('intro.appstatus.fitnessperms.description.ios'),
+      desc: t(`intro.appstatus.fitnessperms.description.${DEVICE_PLATFORM}`),
       fix: fixPerms,
       refresh: checkPerms,
     };
@@ -292,17 +190,57 @@ const usePermissionStatus = () => {
     setCheckList(tempChecks);
   }
 
-  function setupAndroidNotificationChecks() {
-    let fixPerms = function () {
-      console.log('fix and refresh notification permissions');
+  function setupAndroidBluetoothChecks() {
+    if (DEVICE_VERSION >= 10) {
+      let fixPerms = () => {
+        logDebug('fix and refresh bluetooth permissions');
+        return checkOrFix(
+          bluetoothPermissionsCheck,
+          window['cordova'].plugins.BEMDataCollection.fixBluetoothPermissions,
+          true,
+        ).then((error) => {
+          if (error) {
+            bluetoothPermissionsCheck.desc = error;
+          }
+        });
+      };
+      let checkPerms = () => {
+        logDebug('refresh bluetooth permissions');
+        return checkOrFix(
+          bluetoothPermissionsCheck,
+          window['cordova'].plugins.BEMDataCollection.isValidBluetoothPermissions,
+          false,
+        );
+      };
+
+      let bluetoothPermissionsCheck = {
+        name: 'Bluetooth scan permission',
+        desc: 'Scan for BLE beacons to automatically match trips to vehicles',
+        fix: fixPerms,
+        refresh: checkPerms,
+      };
+      let tempChecks = checkList;
+      tempChecks.push(bluetoothPermissionsCheck);
+      setCheckList(tempChecks);
+    }
+  }
+
+  function setupNotificationChecks(hasRequestedNotifs) {
+    let fixPerms = () => {
+      logDebug('fix and refresh notification permissions');
+      appAndChannelNotificationsCheck.wasRequested = true;
       return checkOrFix(
         appAndChannelNotificationsCheck,
         window['cordova'].plugins.BEMDataCollection.fixShowNotifications,
-        true,
-      );
+        false,
+      ).then((error) => {
+        if (error) {
+          appAndChannelNotificationsCheck.desc = error;
+        }
+      });
     };
-    let checkPerms = function () {
-      console.log('fix and refresh notification permissions');
+    let checkPerms = () => {
+      logDebug('refresh notification permissions');
       return checkOrFix(
         appAndChannelNotificationsCheck,
         window['cordova'].plugins.BEMDataCollection.isValidShowNotifications,
@@ -311,9 +249,11 @@ const usePermissionStatus = () => {
     };
     let appAndChannelNotificationsCheck = {
       name: t('intro.appstatus.notificationperms.app-enabled-name'),
-      desc: t('intro.appstatus.notificationperms.description.android-enable'),
+      desc: t(`intro.appstatus.notificationperms.description.${DEVICE_PLATFORM}-enable`),
       fix: fixPerms,
       refresh: checkPerms,
+      isOptional: true,
+      wasRequested: hasRequestedNotifs,
     };
     let tempChecks = checkList;
     tempChecks.push(appAndChannelNotificationsCheck);
@@ -321,43 +261,42 @@ const usePermissionStatus = () => {
   }
 
   function setupAndroidBackgroundRestrictionChecks() {
-    let fixPerms = function () {
-      console.log('fix and refresh backgroundRestriction permissions');
+    let fixPerms = () => {
+      logDebug('fix and refresh backgroundRestriction permissions');
       return checkOrFix(
         unusedAppsUnrestrictedCheck,
         window['cordova'].plugins.BEMDataCollection.fixUnusedAppRestrictions,
         true,
       );
     };
-    let checkPerms = function () {
-      console.log('fix and refresh backgroundRestriction permissions');
+    let checkPerms = () => {
+      logDebug('refresh backgroundRestriction permissions');
       return checkOrFix(
         unusedAppsUnrestrictedCheck,
         window['cordova'].plugins.BEMDataCollection.isUnusedAppUnrestricted,
         false,
       );
     };
-    let fixBatteryOpt = function () {
-      console.log('fix and refresh battery optimization permissions');
+    let fixBatteryOpt = () => {
+      logDebug('fix and refresh battery optimization permissions');
       return checkOrFix(
         ignoreBatteryOptCheck,
         window['cordova'].plugins.BEMDataCollection.fixIgnoreBatteryOptimizations,
         true,
       );
     };
-    let checkBatteryOpt = function () {
-      console.log('fix and refresh battery optimization permissions');
+    let checkBatteryOpt = () => {
+      logDebug('refresh battery optimization permissions');
       return checkOrFix(
         ignoreBatteryOptCheck,
         window['cordova'].plugins.BEMDataCollection.isIgnoreBatteryOptimizations,
         false,
       );
     };
-    const androidVersion = window['device'].version.split('.')[0];
     const androidUnusedDescTag =
-      androidVersion == 12
+      DEVICE_VERSION == 12
         ? 'intro.appstatus.unusedapprestrict.description.android-disable-12'
-        : androidVersion < 12
+        : DEVICE_VERSION < 12
           ? 'intro.appstatus.unusedapprestrict.description.android-disable-lt-12'
           : 'intro.appstatus.unusedapprestrict.description.android-disable-gte-13';
     let unusedAppsUnrestrictedCheck = {
@@ -382,7 +321,7 @@ const usePermissionStatus = () => {
 
     let overallFitnessName = t('intro.appstatus.overall-fitness-name-android');
     let locExplanation = t('intro.appstatus.overall-loc-description');
-    if (window['device'].platform.toLowerCase() == 'ios') {
+    if (DEVICE_PLATFORM == 'ios') {
       overallFitnessName = t('intro.appstatus.overall-fitness-name-ios');
     }
     tempExplanations.push({ name: t('intro.appstatus.overall-loc-name'), desc: locExplanation });
@@ -403,44 +342,43 @@ const usePermissionStatus = () => {
 
     //TODO - update samsung handling based on feedback
 
-    console.log('Explanation = ' + explanationList);
+    logDebug('Explanation = ' + explanationList);
   }
 
-  function createChecklist() {
-    if (window['device'].platform.toLowerCase() == 'android') {
-      setupAndroidLocChecks();
-      setupAndroidFitnessChecks();
-      setupAndroidNotificationChecks();
+  function createChecklist(hasRequestedNotifs) {
+    setupLocChecks();
+    setupFitnessChecks();
+    if (DEVICE_PLATFORM == 'android') {
+      if (appConfig.tracking?.bluetooth_only) {
+        setupAndroidBluetoothChecks();
+      }
       setupAndroidBackgroundRestrictionChecks();
-    } else if (window['device'].platform.toLowerCase() == 'ios') {
-      setupIOSLocChecks();
-      setupIOSFitnessChecks();
-      setupAndroidNotificationChecks();
-    } else {
-      setError('Alert! unknownplatform, no tracking');
-      setErrorVis(true);
-      console.log('Alert! unknownplatform, no tracking'); //need an alert, can use AlertBar?
     }
-
+    setupNotificationChecks(hasRequestedNotifs);
     refreshAllChecks(checkList);
   }
 
-  useAppStateChange(function () {
-    console.log('PERMISSION CHECK: app has resumed, should refresh');
-    refreshAllChecks(checkList);
+  useAppState({
+    onResume: () => {
+      logDebug('PERMISSION CHECK: app has resumed, should refresh');
+      refreshAllChecks(checkList);
+    },
   });
 
   //load when ready
   useEffect(() => {
     if (appConfig && window['device']?.platform) {
-      setupPermissionText();
-      setHaveSetText(true);
-      console.log('setting up permissions');
-      createChecklist();
+      readConsented().then((isConsented) => {
+        DEVICE_PLATFORM = window['device'].platform.toLowerCase();
+        DEVICE_VERSION = window['device'].version.split('.')[0];
+        setupPermissionText();
+        logDebug('setting up permissions');
+        createChecklist(isConsented);
+      });
     }
   }, [appConfig]);
 
-  return { checkList, overallStatus, error, errorVis, setErrorVis, explanationList };
+  return { checkList, overallStatus, explanationList };
 };
 
 export default usePermissionStatus;

@@ -1,5 +1,18 @@
 import packageJsonBuild from '../../package.cordovabuild.json';
 
+export let alerts: string[] = [];
+
+export const mockLogger = () => {
+  window['Logger'] = { log: console.log };
+  window['alert'] = (message) => {
+    console.log(message);
+    alerts.push(message);
+  };
+  console.error = (msg) => {
+    console.log(msg);
+  };
+};
+
 export const mockCordova = () => {
   window['cordova'] ||= {};
   window['cordova'].platformId ||= 'ios';
@@ -178,7 +191,7 @@ export const mockBEMUserCache = (config?) => {
           }, 100),
         );
       } else {
-        return undefined;
+        return Promise.resolve([]);
       }
     },
   };
@@ -229,6 +242,8 @@ export const mockBEMServerCom = () => {
       }, 100);
     },
   };
+  window['cordova'] ||= {};
+  window['cordova'].plugins ||= {};
   window['cordova'].plugins.BEMServerComm = mockBEMServerCom;
 };
 

@@ -8,8 +8,7 @@ import {
   EnketoUserInputEntry,
 } from '../js/survey/enketo/enketoHelper';
 import { mockBEMUserCache } from '../__mocks__/cordovaMocks';
-import { mockLogger } from '../__mocks__/globalMocks';
-import { getConfig, _test_resetStoredConfig } from '../../www/js/config/dynamicConfig';
+import { getConfig, _test_resetPromisedConfig } from '../../www/js/config/dynamicConfig';
 import fakeConfig from '../__mocks__/fakeConfig.json';
 
 import initializedI18next from '../js/i18nextInit';
@@ -18,13 +17,12 @@ import { AppConfig } from '../js/types/appConfigTypes';
 window['i18next'] = initializedI18next;
 
 mockBEMUserCache(fakeConfig);
-mockLogger();
 
 global.URL = require('url').URL;
 global.Blob = require('node:buffer').Blob;
 
 beforeEach(() => {
-  _test_resetStoredConfig();
+  _test_resetPromisedConfig();
 });
 
 it('gets the survey config', async () => {
@@ -47,7 +45,7 @@ it('gets the survey config', async () => {
       version: 9,
     },
   };
-  expect(config.survey_info.surveys).toMatchObject(mockSurveys);
+  expect(config!.survey_info.surveys).toMatchObject(mockSurveys);
 });
 
 it('gets the model response, if avaliable, or returns null', () => {

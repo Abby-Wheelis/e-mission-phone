@@ -10,10 +10,17 @@
 import React, { useState, useMemo } from 'react';
 import { Modal } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import NavBarButton from '../../components/NavBarButton';
 import { RadioButton, Text, Dialog } from 'react-native-paper';
+import { NavBarButton } from '../../components/NavBar';
+import { LabelTabFilter } from '../../TimelineContext';
 
-const FilterSelect = ({ filters, setFilters, numListDisplayed, numListTotal }) => {
+type Props = {
+  filters: LabelTabFilter[] | null;
+  setFilters: (filters: LabelTabFilter[]) => void;
+  numListDisplayed?: number;
+  numListTotal?: number;
+};
+const FilterSelect = ({ filters, setFilters, numListDisplayed, numListTotal }: Props) => {
   const { t } = useTranslation();
   const [modalVisible, setModalVisible] = useState(false);
   const selectedFilter = useMemo(() => filters?.find((f) => f.state)?.key || 'show-all', [filters]);
@@ -25,6 +32,7 @@ const FilterSelect = ({ filters, setFilters, numListDisplayed, numListTotal }) =
   }, [filters, numListDisplayed, numListTotal]);
 
   function chooseFilter(filterKey) {
+    if (!filters) return;
     if (filterKey == 'show-all') {
       setFilters(filters.map((f) => ({ ...f, state: false })));
     } else {
@@ -46,9 +54,7 @@ const FilterSelect = ({ filters, setFilters, numListDisplayed, numListTotal }) =
 
   return (
     <>
-      <NavBarButton
-        icon={filters ? 'chevron-down' : null}
-        onPressAction={() => setModalVisible(true)}>
+      <NavBarButton icon={'chevron-down'} onPress={() => setModalVisible(true)}>
         <Text>{labelDisplayText}</Text>
       </NavBarButton>
       <Modal visible={modalVisible} transparent={true} onDismiss={() => setModalVisible(false)}>
@@ -57,9 +63,7 @@ const FilterSelect = ({ filters, setFilters, numListDisplayed, numListTotal }) =
           {/* <Dialog.Title>{t('diary.filter-travel')}</Dialog.Title> */}
           <Dialog.Content>
             <RadioButton.Group onValueChange={(k) => chooseFilter(k)} value={selectedFilter}>
-              {filters.map((f) => (
-                <RadioButton.Item key={f.key} label={f.text} value={f.key} />
-              ))}
+              {filters?.map((f) => <RadioButton.Item key={f.key} label={f.text} value={f.key} />)}
               <RadioButton.Item
                 label={t('diary.show-all') + ' (' + numListTotal + ')'}
                 value="show-all"

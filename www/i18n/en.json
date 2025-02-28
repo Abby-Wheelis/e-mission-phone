@@ -8,7 +8,10 @@
   "trip-confirm": {
     "services-please-fill-in": "Please fill in the {{text}} not listed.",
     "services-cancel": "Cancel",
-    "services-save": "Save"
+    "services-save": "Save",
+    "custom-mode": "Custom Mode",
+    "custom-purpose": "Custom Purpose",
+    "custom-labels": "Custom Labels"
   },
 
   "control": {
@@ -23,12 +26,13 @@
     "force-sync": "Force sync",
     "share": "Share",
     "download-json-dump": "Download json dump",
-    "email-log": "Email log",
+    "share-log": "Share log",
     "upload-log": "Upload log",
     "view-privacy": "View Privacy Policy",
     "user-data": "User data",
     "erase-data": "Erase data",
     "dev-zone": "Developer zone",
+    "bluetooth-scan": "Scan for Bluetooth",
     "refresh": "Refresh",
     "end-trip-sync": "End trip + sync",
     "check-consent": "Check consent",
@@ -47,7 +51,12 @@
     "reminders-time-of-day": "Time of Day for Reminders ({{time}})",
     "upcoming-notifications": "Upcoming Notifications",
     "dummy-notification": "Dummy Notification in 5 Seconds",
-    "log-out": "Log Out"
+    "log-out": "Log Out",
+    "refresh-app-config": "Refresh App Configuration",
+    "current-version": "Current version: {{version}}",
+    "refreshing-app-config": "Refreshing app configuration, please wait...",
+    "already-up-to-date": "Already up to date!",
+    "manage-custom-labels": "Manage Custom Labels"
   },
 
   "general-settings": {
@@ -75,42 +84,74 @@
 
   "metrics": {
     "dashboard-tab": "Dashboard",
-    "cancel": "Cancel",
-    "confirm": "Confirm",
-    "get": "Get",
-    "range": "Range",
-    "filter": "Filter",
-    "from": "From:",
-    "to": "To:",
-    "last-week": "last week",
-    "frequency": "Frequency:",
-    "pandafreqoptions-daily": "DAILY",
-    "pandafreqoptions-weekly": "WEEKLY",
-    "pandafreqoptions-biweekly": "BIWEEKLY",
-    "pandafreqoptions-monthly": "MONTHLY",
-    "pandafreqoptions-yearly": "YEARLY",
-    "freqoptions-daily": "DAILY",
-    "freqoptions-monthly": "MONTHLY",
-    "freqoptions-yearly": "YEARLY",
-    "select-pandafrequency": "Select summary freqency",
-    "select-frequency": "Select summary freqency",
-    "chart-xaxis-date": "Date",
-    "chart-no-data": "No Data Available",
-    "trips-yaxis-number": "Number",
-    "calorie-data-change": " change",
-    "calorie-data-unknown": "Unknown...",
-    "greater-than": " greater than ",
-    "greater": " greater ",
-    "or": "or",
-    "less-than": " less than ",
-    "less": " less ",
-    "week-before": "vs. week before",
-    "this-week": "this week",
-    "pick-a-date": "Pick a date",
-    "trips": "trips",
-    "hours": "hours",
-    "minutes": "minutes",
-    "custom": "Custom"
+    "no-data": "No data",
+    "no-data-available": "No data available",
+    "footprint": {
+      "footprint": "Footprint",
+      "estimated-footprint": "Estimated Footprint",
+      "ghg-emissions": "GHG Emissions",
+      "energy-usage": "Energy Usage",
+      "us-2030-goal": "2030 Guideline",
+      "us-2050-goal": "2050 Guideline",
+      "us-goals-footnote": "Guidelines are based on US decarbonization goals, scaled to per-capita travel-related footprint.",
+      "labeled": "Labeled",
+      "unlabeled": "Unlabeled",
+      "uncertainty-footnote": "Due to the uncertainty of unlabeled trips, estimates may fall anywhere within the shown range. Label more trips for richer estimates.",
+      "daily-emissions-by-week": "Daily Emissions by Week",
+      "kg-co2e-per-day": "Average kg CO₂e / day",
+      "daily-energy-by-week": "Daily Energy Usage by Week",
+      "kwh-per-day": "Average kWh / day",
+      "daily-emissions-comparison": "Daily Emissions vs. Group",
+      "daily-energy-comparison": "Daily Energy Usage vs. Group",
+      "you": "You",
+      "group-average": "Group Average"
+    },
+    "movement": {
+      "movement": "Movement",
+      "active-minutes": "Active Minutes",
+      "daily-active-minutes": "Daily Minutes of Active Travel",
+      "weekly-active-minutes": "Weekly Minutes of Active Travel",
+      "active-minutes-table": "Table of Active Minutes",
+      "weekly-goal": "Weekly Goal",
+      "weekly-goal-footnote": "*Weekly goal based on CDC recommendation of 150 minutes of moderate activity per week.",
+      "minutes": "minutes"
+    },
+    "travel": {
+      "travel": "Travel",
+      "count": "Trip Count",
+      "distance": "Distance",
+      "duration": "Duration",
+      "trips": "trips",
+      "hours": "hours",
+      "user-totals": "My Totals",
+      "group-totals": "Group Totals"
+    },
+    "surveys": {
+      "surveys": "Surveys",
+      "survey-response-rate": "Survey Response Rate (%)",
+      "survey-leaderboard-desc": "This data has been accumulated since ",
+      "trip-categories": "Trip Categories",
+      "response": "Response",
+      "no-response": "No Response",
+      "responses": "responses",
+      "comparison": "Comparison",
+      "you": "You",
+      "others": "Others in group"
+    },
+    "leaderboard": {
+      "leaderboard": "Leaderboard",
+      "you-are-in-x-place": "You are in #{{x}} place",
+      "data-accumulated-since-date": "This data has been accumulated since {{date}}"
+    },
+    "stack-bars": "Stack bars:",
+    "split-by": "Split by {{field}}:",
+    "grouping-fields": {
+      "mode_confirm": "Mode",
+      "purpose_confirm": "Purpose",
+      "replaced_mode_confirm": "Replaced Mode",
+      "primary_ble_sensed_mode": "Detected Mode",
+      "survey": "Survey"
+    }
   },
 
   "diary": {
@@ -131,7 +172,6 @@
     "choose-mode": "Mode",
     "choose-replaced-mode": "Replaces",
     "choose-purpose": "Purpose",
-    "choose-survey": "Add Trip Details",
     "select-mode-scroll": "Mode (scroll for more)",
     "select-replaced-mode-scroll": "Replaces (scroll for more)",
     "select-purpose-scroll": "Purpose (scroll for more)",
@@ -144,7 +184,8 @@
     "show-more-travel": "Show More Travel",
     "show-older-travel": "Show Older Travel",
     "no-travel": "No travel to show",
-    "no-travel-hint": "To see more, change the filters above or go record some travel!"
+    "no-travel-hint": "To see more, change the filters above or go record some travel!",
+    "jump-to-last-processed-week": "Jump to the last processed week"
   },
 
   "multilabel": {
@@ -183,44 +224,6 @@
     "other": "Other"
   },
 
-  "main-metrics": {
-    "summary": "My Summary",
-    "chart": "Chart",
-    "change-data": "Change dates:",
-    "distance": "Distance",
-    "trips": "Trips",
-    "duration": "Duration",
-    "fav-mode": "My Favorite Mode",
-    "speed": "My Speed",
-    "footprint": "My Footprint",
-    "estimated-emissions": "Estimated CO₂ emissions",
-    "how-it-compares": "Ballpark comparisons",
-    "optimal": "Optimal (perfect mode choice for all my trips)",
-    "average": "Group Avg.",
-    "worst-case": "Worse Case",
-    "label-to-squish": "Label trips to collapse the range into a single number",
-    "range-uncertain-footnote": "²Due to the uncertainty of unlabeled trips, estimates may fall anywhere within the shown range. Label more trips for richer estimates.",
-    "lastweek": "My last week value:",
-    "us-2030-goal": "2030 Guideline¹",
-    "us-2050-goal": "2050 Guideline¹",
-    "us-goals-footnote": "¹Guidelines based on US decarbonization goals, scaled to per-capita travel-related emissions.",
-    "past-week": "Past Week",
-    "prev-week": "Prev. Week",
-    "no-summary-data": "No summary data",
-    "mean-speed": "My Average Speed",
-    "user-totals": "My Totals",
-    "group-totals": "Group Totals",
-    "active-minutes": "Active Minutes",
-    "weekly-active-minutes": "Weekly minutes of active travel",
-    "daily-active-minutes": "Daily minutes of active travel",
-    "active-minutes-table": "Table of active minutes metrics",
-    "weekly-goal": "Weekly Goal³",
-    "weekly-goal-footnote": "³Weekly goal based on CDC recommendation of 150 minutes of moderate activity per week.",
-    "labeled": "Labeled",
-    "unlabeled": "Unlabeled²",
-    "footprint-label": "Footprint (kg CO₂)"
-  },
-
   "details": {
     "speed": "Speed",
     "time": "Time"
@@ -230,21 +233,40 @@
   "list-datepicker-close": "Close",
   "list-datepicker-set": "Set",
 
+  "bluetooth": {
+    "title": {
+      "ble": "BLE Beacon Scanner",
+      "classic": "Bluetooth Classic Scanner"
+    },
+    "scan": {
+      "for-ble": "Scan for BLE Beacons",
+      "for-bluetooth": "Scan for Classic Devices",
+      "stop": "Stop Scanning"
+    },
+    "is-scanning": "Scanning...",
+    "device-info": {
+      "id": "ID",
+      "name": "Name"
+    },
+    "switch-to": {
+      "classic": "Switch to Classic",
+      "ble": "Switch to BLE"
+    }
+  },
+
   "service": {
     "reading-server": "Reading from server...",
     "reading-unprocessed-data": "Reading unprocessed data..."
   },
 
-  "email-service": {
-    "email-account-not-configured": "Email account is not configured, cannot send email",
-    "email-account-mail-app": "You must have the mail app on your phone configured with an email address. Otherwise, this won't work",
-    "going-to-email": "Going to email database from {{parentDir}}",
-    "email-log": {
+  "shareFile-service": {
+    "send-to": "Please send this file to openpath@nrel.gov, or another OpenPATH team member.",
+    "send-log": {
       "subject-logs": "emission logs",
       "body-please-fill-in-what-is-wrong": "please fill in what is wrong"
     },
     "no-email-address-configured": "No email address configured.",
-    "email-data": {
+    "send-data": {
       "subject-data-dump-from-to": "Data dump from {{start}} to {{end}}",
       "body-data-consists-of-list-of-entries": "Data consists of a list of entries.\nEntry formats are at https://github.com/e-mission/e-mission-server/tree/master/emission/core/wrapper \nData can be loaded locally using instructions at https://github.com/e-mission/e-mission-server#loading-test-data \n and can be manipulated using the example at https://github.com/e-mission/e-mission-server/blob/master/Timeseries_Sample.ipynb"
     }
@@ -274,7 +296,7 @@
         "description": {
           "android-lt-9": "Location services should be enabled and set to High Accuracy. This allows us to accurately record the trajectory of the travel",
           "android-gte-9": "Location services should be enabled. This allows us to access location data and generate the trip log",
-          "ios": "Location services should be enabled. This allows us to access location data and generate the trip log"
+          "ios": "Turn on location services to enable location tracking"
         }
       },
       "locperms": {
@@ -285,27 +307,28 @@
           "android-10": "Please select 'Allow all the time'",
           "android-11": "On the app settings page, choose the 'Location' permission and set it to 'Allow all the time'",
           "android-gte-12": "On the app settings page, choose the 'Location' permission and set it to 'Allow all the time' and 'Precise'",
-          "ios-lt-13": "Please select 'Always allow'",
-          "ios-gte-13": "On the app settings page, please select 'Always' and 'Precise' and return here to continue"
+          "ios-lt-13": "Select 'Always Allow' to enable location tracking",
+          "ios-13-13.3": "Select 'Always' location permissions on the next screen to enable location tracking, then return here to continue",
+          "ios-gte-13.4": "Select 'Precise' and 'Allow While Using App' on the next screen, then 'Change to Always Allow' to enable location tracking"
         }
       },
       "overall-fitness-name-android": "Physical activity",
       "overall-fitness-name-ios": "Motion and Fitness",
-      "overall-fitness-description": "The fitness sensors distinguish between walking, bicycling and motorized modes.  We use this data in order to separate the parts of multi-modal travel such as transit. We also use it to as a cross-check potentially spurious trips - if the location sensor jumps across town but the fitness sensor is stationary, we can guess that the trip was invalid.",
+      "overall-fitness-description": "The fitness sensors distinguish between walking, bicycling and motorized modes. We use this data in order to separate the parts of multi-modal travel such as transit. We also use it to as a cross-check potentially spurious trips - if the location sensor jumps across town but the fitness sensor is stationary, we can guess that the trip was invalid.",
       "fitnessperms": {
         "name": "Fitness Permission",
         "description": {
-          "android": "Please allow.",
-          "ios": "Please allow."
+          "android": "Allow motion and fitness tracking to enable mode detection",
+          "ios": "Allow motion and fitness tracking to enable mode detection"
         }
       },
       "overall-notification-name": "Notifications",
-      "overall-notification-description": "We need to use notifications to inform you if the settings are incorrect. We also use hourly invisible push notifications to wake up the app and allow it to upload data and check app status. We also use notifications to remind you to label your trips.",
+      "overall-notification-description": "We use notifications to alert you if settings are incorrect and to remind you to label your trips.",
       "notificationperms": {
         "app-enabled-name": "App Notifications",
         "description": {
-          "android-enable": "On the app settings page, ensure that all notifications and channels are enabled.",
-          "ios-enable": "Please allow, on the popup or the app settings page if necessary"
+          "android-enable": "On the app settings page, enable notifications for reminders and app status alerts.",
+          "ios-enable": "Allow notifications for reminders and app status alerts"
         }
       },
       "overall-background-restrictions-name": "Background restrictions",
@@ -381,7 +404,9 @@
     "all-green-status": "Make sure that all status checks are green",
     "dont-force-kill": "Do not force kill the app",
     "background-restrictions": "On Samsung and Huwaei phones, make sure that background restrictions are turned off",
-    "close": "Close"
+    "close": "Close",
+    "proceeding-with-token": "Proceeding with OPcode: {{token}}",
+    "already-logged-in": "You are already logged in with OPcode {{token}}. If you wish to use a different OPcode, please log out first."
   },
   "config": {
     "unable-read-saved-config": "Unable to read saved config",
@@ -409,7 +434,8 @@
     "while-repopulating-entry": "While repopulating timeline entry: ",
     "while-loading-metrics": "While loading metrics: ",
     "while-log-messages": "While getting messages from the log ",
-    "while-max-index": "While getting max index "
+    "while-max-index": "While getting max index ",
+    "while-scanning-bluetooth": "While scanning for Bluetooth Devices: "
   },
   "consent-text": {
     "title": "NREL OPENPATH PRIVACY POLICY/TERMS OF USE",

@@ -1,7 +1,4 @@
-import { mockLogger } from '../__mocks__/globalMocks';
 import { fetchUrlCached } from '../js/services/commHelper';
-
-mockLogger();
 
 // mock for JavaScript 'fetch'
 // we emulate a 100ms delay when i) fetching data and ii) parsing it as text
@@ -47,4 +44,8 @@ it('fetches text from a URL and caches it so the next call is faster', async () 
   * - updateUser
   * - getUser
   * - putOne
+  * - getUserCustomLabels
+  * - insertUserCustomLabel
+  * - updateUserCustomLabel
+  * - deleteUserCustomLabel
 */

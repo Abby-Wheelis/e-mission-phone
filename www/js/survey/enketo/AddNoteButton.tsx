@@ -11,7 +11,7 @@ import React, { useEffect, useState, useContext } from 'react';
 import DiaryButton from '../../components/DiaryButton';
 import { useTranslation } from 'react-i18next';
 import { DateTime } from 'luxon';
-import LabelTabContext from '../../diary/LabelTabContext';
+import TimelineContext from '../../TimelineContext';
 import EnketoModal from './EnketoModal';
 import { displayErrorMsg, logDebug } from '../../plugin/logger';
 import { isTrip } from '../../types/diaryTypes';
@@ -24,11 +24,11 @@ type Props = {
 const AddNoteButton = ({ timelineEntry, notesConfig, storeKey }: Props) => {
   const { t, i18n } = useTranslation();
   const [displayLabel, setDisplayLabel] = useState('');
-  const { notesFor, addUserInputToEntry } = useContext(LabelTabContext);
+  const { notesFor, addUserInputToEntry } = useContext(TimelineContext);
 
   useEffect(() => {
     let newLabel: string;
-    const localeCode = i18n.language;
+    const localeCode = i18n.resolvedLanguage || 'en';
     if (notesConfig?.['filled-in-label'] && notesFor(timelineEntry)?.length) {
       newLabel = notesConfig?.['filled-in-label']?.[localeCode];
       setDisplayLabel(newLabel);
@@ -83,7 +83,7 @@ const AddNoteButton = ({ timelineEntry, notesConfig, storeKey }: Props) => {
 
   function launchAddNoteSurvey() {
     const surveyName = notesConfig.surveyName;
-    console.log('About to launch survey ', surveyName);
+    logDebug(`AddNoteButton: about to launch survey ${surveyName}`);
     setPrefillTimes(getPrefillTimes());
     setModalVisible(true);
   }

@@ -1,13 +1,14 @@
 import React from 'react';
-import { ScrollView, View } from 'react-native';
+import { ScrollView, View, useWindowDimensions } from 'react-native';
 
-type Props = {
-  children: React.ReactNode;
-  cardWidth: number;
-  cardMargin: number;
-};
-const Carousel = ({ children, cardWidth, cardMargin }: Props) => {
+const cardMargin = 10;
+
+type Props = { children: React.ReactNode };
+const Carousel = ({ children }: Props) => {
   const numCards = React.Children.count(children);
+  const { width: windowWidth } = useWindowDimensions();
+  const cardWidth = windowWidth * 0.88;
+
   return (
     <ScrollView
       horizontal={true}
@@ -16,11 +17,16 @@ const Carousel = ({ children, cardWidth, cardMargin }: Props) => {
       snapToAlignment={'center'}
       style={s.carouselScroll(cardMargin)}
       contentContainerStyle={{ alignItems: 'flex-start' }}>
-      {React.Children.map(children, (child, i) => (
-        <View style={s.carouselCard(cardWidth, cardMargin, i == 0, i == numCards - 1)}>
-          {child}
-        </View>
-      ))}
+      {React.Children.map(
+        children,
+        (child, i) =>
+          // If child is `null`, we need to skip it; otherwise, it takes up space
+          child && (
+            <View style={s.carouselCard(cardWidth, cardMargin, i == 0, i == numCards - 1)}>
+              {child}
+            </View>
+          ),
+      )}
     </ScrollView>
   );
 };

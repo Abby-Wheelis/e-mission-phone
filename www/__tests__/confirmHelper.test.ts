@@ -1,5 +1,3 @@
-import { mockLogger } from '../__mocks__/globalMocks';
-import * as CommHelper from '../js/services/commHelper';
 import {
   baseLabelInputDetails,
   getLabelInputDetails,
@@ -7,23 +5,17 @@ import {
   inferFinalLabels,
   labelInputDetailsForTrip,
   labelKeyToReadable,
-  labelKeyToRichMode,
-  labelOptionByValue,
+  labelKeyToText,
   readableLabelToKey,
   verifiabilityForTrip,
 } from '../js/survey/multilabel/confirmHelper';
 
 import initializedI18next from '../js/i18nextInit';
 import { CompositeTrip, UserInputEntry } from '../js/types/diaryTypes';
-import { UserInputMap } from '../js/diary/LabelTabContext';
+import { UserInputMap } from '../js/TimelineContext';
 window['i18next'] = initializedI18next;
-mockLogger();
 
-const fakeAppConfig = {
-  label_options: 'json/label-options.json.sample',
-};
 const fakeAppConfigWithModeOfStudy = {
-  ...fakeAppConfig,
   intro: {
     mode_studied: 'walk',
   },
@@ -45,6 +37,16 @@ const fakeDefaultLabelOptions = {
     },
   },
 };
+const fakeInputs = {
+  MODE: [
+    { data: { label: 'walk', start_ts: 1245, end_ts: 5678 } },
+    { data: { label: 'bike', start_ts: 1245, end_ts: 5678 } },
+  ],
+  PURPOSE: [
+    { data: { label: 'home', start_ts: 1245, end_ts: 5678 } },
+    { data: { label: 'work', start_ts: 1245, end_ts: 5678 } },
+  ],
+};
 
 jest.mock('../js/services/commHelper', () => ({
   ...jest.requireActual('../js/services/commHelper'),
@@ -54,16 +56,16 @@ jest.mock('../js/services/commHelper', () => ({
 }));
 
 describe('confirmHelper', () => {
-  it('returns labelOptions given an appConfig', async () => {
-    const labelOptions = await getLabelOptions(fakeAppConfig);
+  it('returns default labelOptions given a blank appConfig', async () => {
+    const labelOptions = await getLabelOptions({});
     expect(labelOptions).toBeTruthy();
-    expect(labelOptions.MODE[0].text).toEqual('Walk'); // translation is filled in
+    expect(labelOptions.MODE[0].value).toEqual('walk');
   });
 
   it('returns base labelInputDetails for a labelUserInput which does not have mode of study', () => {
     const fakeLabelUserInput = {
-      MODE: fakeDefaultLabelOptions.MODE[1],
-      PURPOSE: fakeDefaultLabelOptions.PURPOSE[0],
+      MODE: fakeInputs.MODE[1],
+      PURPOSE: fakeInputs.PURPOSE[0],
     };
     const labelInputDetails = labelInputDetailsForTrip(
       fakeLabelUserInput,
@@ -74,8 +76,8 @@ describe('confirmHelper', () => {
 
   it('returns full labelInputDetails for a labelUserInput which has the mode of study', () => {
     const fakeLabelUserInput = {
-      MODE: fakeDefaultLabelOptions.MODE[0], // 'walk' is mode of study
-      PURPOSE: fakeDefaultLabelOptions.PURPOSE[0],
+      MODE: fakeInputs.MODE[0], // 'walk' is mode of study
+      PURPOSE: fakeInputs.PURPOSE[0],
     };
     const labelInputDetails = labelInputDetailsForTrip(
       fakeLabelUserInput,
@@ -105,10 +107,10 @@ describe('confirmHelper', () => {
 
   it('looks up a rich mode from a label key, or humanizes the label key if there is no rich mode', () => {
     const key = 'walk';
-    const richMode = labelKeyToRichMode(key);
+    const richMode = labelKeyToText(key);
     expect(richMode).toEqual('Walk');
     const key2 = 'scooby_doo_mystery_machine';
-    const readableMode = labelKeyToRichMode(key2);
+    const readableMode = labelKeyToText(key2);
     expect(readableMode).toEqual('Scooby Doo Mystery Machine');
   });
 

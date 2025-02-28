@@ -24,7 +24,7 @@ https://github.com/e-mission/e-mission-docs/tree/master/docs/e-mission-phone
 
 Updating the UI only
 ---
-[![osx-serve-install](https://github.com/e-mission/e-mission-phone/workflows/osx-serve-install/badge.svg)](https://github.com/e-mission/e-mission-phone/actions?query=workflow%3Aosx-serve-install)
+[![osx-serve-install](https://github.com/e-mission/e-mission-phone/workflows/osx-serve-install/badge.svg?branch=master&event=push)](https://github.com/e-mission/e-mission-phone/actions?query=workflow%3Aosx-serve-install)
 
 If you want to make only UI changes, (as opposed to modifying the existing plugins, adding new plugins, etc), you can use the **new and improved** (as of June 2018) [e-mission dev app](https://github.com/e-mission/e-mission-devapp/) and install the most recent version from [releases](https://github.com/e-mission/e-mission-devapp/releases). 
 
@@ -87,9 +87,9 @@ If you wish to connect to a different server, create your own config file accord
 
 Updating the e-mission-\* plugins or adding new plugins
 ---
-[![osx-build-ios](https://github.com/e-mission/e-mission-phone/actions/workflows/ios-build.yml/badge.svg)](https://github.com/e-mission/e-mission-phone/actions/workflows/ios-build.yml)
-[![osx-build-android](https://github.com/e-mission/e-mission-phone/actions/workflows/android-build.yml/badge.svg)](https://github.com/e-mission/e-mission-phone/actions/workflows/android-build.yml)
-[![osx-android-prereq-sdk-install](https://github.com/e-mission/e-mission-phone/actions/workflows/android-automated-sdk-install.yml/badge.svg)](https://github.com/e-mission/e-mission-phone/actions/workflows/android-automated-sdk-install.yml)
+[![osx-build-ios](https://github.com/e-mission/e-mission-phone/actions/workflows/ios-build.yml/badge.svg?branch=master&event=push)](https://github.com/e-mission/e-mission-phone/actions/workflows/ios-build.yml?event-push)
+[![osx-build-android](https://github.com/e-mission/e-mission-phone/actions/workflows/android-build.yml/badge.svg?branch=master&event=push)](https://github.com/e-mission/e-mission-phone/actions/workflows/android-build.yml?event=push)
+[![osx-android-prereq-sdk-install](https://github.com/e-mission/e-mission-phone/actions/workflows/android-automated-sdk-install.yml/badge.svg?branch=master&event=push)](https://github.com/e-mission/e-mission-phone/actions/workflows/android-automated-sdk-install.yml?event=push)
 
 Pre-requisites
 ---
@@ -143,14 +143,10 @@ builds with your configuration. That is almost certainly the source of the error
 
 Installing (one time only)
 ---
-Run the setup script for the platform you want to build
+Run the setup script
 
 ```
-bash setup/setup_android_native.sh
-```
-AND/OR
-```
-bash setup/setup_ios_native.sh
+bash setup/setup__native.sh
 ```
 
 ### Activation (after install, and in every new shell)

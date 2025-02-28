@@ -8,7 +8,7 @@ import { getConfig } from '../../config/dynamicConfig';
 import { DateTime } from 'luxon';
 import { fetchUrlCached } from '../../services/commHelper';
 import { getUnifiedDataForInterval } from '../../services/unifiedDataLoader';
-import { AppConfig, EnketoSurveyConfig } from '../../types/appConfigTypes';
+import { AppConfig, EnketoSurveyConfig, SurveyButtonConfig } from '../../types/appConfigTypes';
 import {
   CompositeTrip,
   ConfirmedPlace,
@@ -49,6 +49,7 @@ type EnketoResponse = {
 
 export type EnketoUserInputData = UserInputData & {
   key?: string;
+  name: string;
   version: number;
   xmlResponse: string;
   jsonDocResponse: { [k: string]: any };
@@ -57,12 +58,10 @@ export type EnketoUserInputEntry = UserInputEntry<EnketoUserInputData>;
 
 const LABEL_FUNCTIONS = {
   UseLabelTemplate: async (xmlDoc: XMLDocument, name: string) => {
-    let appConfig = await getConfig();
-    const configSurveys = appConfig.survey_info.surveys;
-
-    const config = configSurveys[name]; // config for this survey
-    const lang = i18next.language;
-    const labelTemplate = config.labelTemplate?.[lang];
+    const appConfig = await getConfig();
+    const config = appConfig?.survey_info?.surveys?.[name]; // config for this survey
+    const lang = i18next.resolvedLanguage || 'en';
+    const labelTemplate = config?.labelTemplate?.[lang];
 
     if (!labelTemplate) return 'Answered'; // no template given in config
     if (!config.labelVars) return labelTemplate; // if no vars given, nothing to interpolate,
@@ -292,12 +291,12 @@ export function saveResponse(
     .then((data) => data);
 }
 
-const _getMostRecent = (responses) => {
+function _getMostRecent(responses) {
   responses.sort((a, b) => a.metadata.write_ts < b.metadata.write_ts);
   logDebug(`_getMostRecent: first response is ${responses[0]}; 
                             last response is ${responses.slice(-1)[0]}`);
   return responses[0];
-};
+}
 
 /*
  * We retrieve all the records every time instead of caching because of the
@@ -313,6 +312,32 @@ export function loadPreviousResponseForSurvey(dataKey: string) {
   return getUnifiedDataForInterval(dataKey, tq, getMethod).then((responses) =>
     _getMostRecent(responses),
   );
+}
+
+/**
+ * @description Returns an array of surveys that could be prompted for one button in the UI (trip label, trip notes, place label, or place notes)
+ *  (If multiple are returned, they will show conditionally in the UI based on their `showsIf` field)
+ *  Includes backwards compats for app config fields that didn't use to exist
+ */
+export function resolveSurveyButtonConfig(
+  config: AppConfig,
+  button: 'trip-label' | 'trip-notes' | 'place-label' | 'place-notes',
+): SurveyButtonConfig[] {
+  const buttonConfig = config.survey_info.buttons?.[button];
+  // backwards compat: default to the trip confirm survey if this button isn't configured
+  if (!buttonConfig) {
+    return [
+      {
+        surveyName: 'TripConfirmSurvey',
+        'not-filled-in-label': {
+          en: 'Add Trip Details',
+          es: 'Agregar detalles del viaje',
+          lo: 'ເພີ່ມລາຍລະອຽດການເດີນທາງ',
+        },
+      },
+    ];
+  }
+  return buttonConfig instanceof Array ? buttonConfig : [buttonConfig];
 }
 
 export async function fetchSurvey(url: string) {

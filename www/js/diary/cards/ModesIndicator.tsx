@@ -1,39 +1,38 @@
 import React, { useContext } from 'react';
 import { View, StyleSheet } from 'react-native';
 import color from 'color';
-import LabelTabContext from '../LabelTabContext';
+import TimelineContext from '../../TimelineContext';
 import { logDebug } from '../../plugin/logger';
-import { getBaseModeByValue } from '../diaryHelper';
-import { Icon } from '../../components/Icon';
-import { Text, useTheme } from 'react-native-paper';
+import { Text, Icon, useTheme } from 'react-native-paper';
 import { useTranslation } from 'react-i18next';
+import { base_modes } from 'e-mission-common';
+import { labelKeyToText } from '../../survey/multilabel/confirmHelper';
 
 const ModesIndicator = ({ trip, detectedModes }) => {
   const { t } = useTranslation();
-  const { labelOptions, labelFor } = useContext(LabelTabContext);
+  const { labelOptions, labelFor, confirmedModeFor } = useContext(TimelineContext);
   const { colors } = useTheme();
 
   const indicatorBackgroundColor = color(colors.onPrimary).alpha(0.8).rgb().string();
   let indicatorBorderColor = color('black').alpha(0.5).rgb().string();
 
   let modeViews;
-  const labeledModeForTrip = labelFor(trip, 'MODE');
-  if (labelOptions && labeledModeForTrip?.value) {
-    const baseMode = getBaseModeByValue(labeledModeForTrip.value, labelOptions);
-    indicatorBorderColor = baseMode.color;
-    logDebug(`TripCard: got baseMode = ${JSON.stringify(baseMode)}`);
+  const confirmedMode = confirmedModeFor(trip);
+  if (labelOptions && confirmedMode?.value) {
+    indicatorBorderColor = confirmedMode.color;
+    logDebug(`TripCard: got confirmedMode = ${JSON.stringify(confirmedMode)}`);
     modeViews = (
       <View style={s.mode}>
-        <Icon icon={baseMode.icon} iconColor={baseMode.color} size={15} />
+        <Icon source={confirmedMode.icon} color={confirmedMode.color} size={15} />
         <Text
-          accessibilityLabel={`Labeled mode: ${baseMode.icon}`}
+          accessibilityLabel={`Labeled mode: ${confirmedMode.icon}`}
           style={{
-            color: baseMode.color,
+            color: confirmedMode.color,
             fontSize: 12,
             fontWeight: '500',
             textDecorationLine: 'underline',
           }}>
-          {labelFor(trip, 'MODE')?.text}
+          {labelKeyToText(confirmedMode.value)}
         </Text>
       </View>
     );
@@ -47,7 +46,7 @@ const ModesIndicator = ({ trip, detectedModes }) => {
         <Text style={{ fontSize: 12, fontWeight: '500' }}>{t('diary.detected')}</Text>
         {detectedModes?.map?.((pct, i) => (
           <View key={i} style={s.mode}>
-            <Icon icon={pct.icon} iconColor={pct.color} size={15} />
+            <Icon source={pct.icon} color={pct.color} size={15} />
             {/* show percents if there are more than one detected modes */}
             {detectedModes?.length > 1 && (
               <Text

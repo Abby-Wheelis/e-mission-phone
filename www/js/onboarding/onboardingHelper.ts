@@ -4,6 +4,7 @@ import { storageGet, storageSet } from '../plugin/storage';
 import { logDebug } from '../plugin/logger';
 import { EVENTS, publish } from '../customEventHandler';
 import { readConsentState, isConsented } from '../splash/startprefs';
+import { addStatReading } from '../plugin/clientStats';
 
 export const INTRO_DONE_KEY = 'intro_done';
 
@@ -62,23 +63,28 @@ export function getPendingOnboardingState(): Promise<OnboardingState> {
         route = OnboardingRoute.SURVEY;
       }
 
+      const opcode = config?.joined?.opcode;
+
       logDebug(`pending onboarding state is ${route}; 
         isIntroDone = ${isIntroDone}; 
         config = ${config}; 
         isConsented = ${isConsented}; 
-        saveQrDone = ${saveQrDone}`);
+        saveQrDone = ${saveQrDone}; 
+        opcode = ${opcode}`);
 
-      return { route, opcode: config?.joined?.opcode };
+      addStatReading('onboarding_state', { route, opcode });
+
+      return { route, opcode };
     },
   );
 }
 
-async function readConsented() {
+export async function readConsented() {
   return readConsentState().then(isConsented) as Promise<boolean>;
 }
 
 export async function readIntroDone() {
-  return storageGet(INTRO_DONE_KEY).then((read_val) => !!read_val) as Promise<boolean>;
+  return storageGet(INTRO_DONE_KEY).then((read_val) => Boolean(read_val)) as Promise<boolean>;
 }
 
 export async function markIntroDone() {

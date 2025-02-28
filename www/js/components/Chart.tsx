@@ -4,7 +4,8 @@ import { useTheme } from 'react-native-paper';
 import { ChartData, Chart as ChartJS, ScriptableContext, registerables } from 'chart.js';
 import { Chart as ChartJSChart } from 'react-chartjs-2';
 import Annotation, { AnnotationOptions, LabelPosition } from 'chartjs-plugin-annotation';
-import { dedupColors, getChartHeight, darkenOrLighten } from './charting';
+import { getChartHeight } from './charting';
+import { base_modes } from 'e-mission-common';
 import { logDebug } from '../plugin/logger';
 
 ChartJS.register(...registerables, Annotation);
@@ -14,9 +15,10 @@ type ChartDataset = {
   label: string;
   data: XYPair[];
 };
+export type ChartRecord = { label: string; x: number | string; y: number | string };
 
 export type Props = {
-  records: { label: string; x: number | string; y: number | string }[];
+  records: ChartRecord[];
   axisTitle: string;
   type: 'bar' | 'line';
   getColorForLabel?: (label: string) => string;
@@ -31,6 +33,10 @@ export type Props = {
   isHorizontal?: boolean;
   timeAxis?: boolean;
   stacked?: boolean;
+  showLegend?: boolean;
+  reverse?: boolean;
+  enableTooltip?: boolean;
+  maxBarThickness?: number;
 };
 const Chart = ({
   records,
@@ -43,6 +49,10 @@ const Chart = ({
   isHorizontal,
   timeAxis,
   stacked,
+  showLegend = true,
+  reverse = true,
+  enableTooltip = true,
+  maxBarThickness = 100,
 }: Props) => {
   const { colors } = useTheme();
   const [numVisibleDatasets, setNumVisibleDatasets] = useState(1);
@@ -55,7 +65,7 @@ const Chart = ({
     let labelColorMap; // object mapping labels to colors
     if (getColorForLabel) {
       const colorEntries = chartDatasets.map((d) => [d.label, getColorForLabel(d.label)]);
-      labelColorMap = dedupColors(colorEntries);
+      labelColorMap = base_modes.dedupe_colors(colorEntries, [0.4, 1.6]);
     }
     return {
       datasets: chartDatasets.map((e, i) => ({
@@ -64,10 +74,11 @@ const Chart = ({
           labelColorMap?.[e.label] ||
           getColorForChartEl?.(chartRef.current, e, barCtx, 'background'),
         borderColor: (barCtx) =>
-          darkenOrLighten(labelColorMap?.[e.label], -0.5) ||
+          base_modes.scale_lightness(labelColorMap?.[e.label], 0.5) ||
           getColorForChartEl?.(chartRef.current, e, barCtx, 'border'),
         borderWidth: borderWidth || 2,
         borderRadius: 3,
+        maxBarThickness: maxBarThickness,
       })),
     };
   }, [chartDatasets, getColorForLabel]);
@@ -112,6 +123,7 @@ const Chart = ({
           responsive: true,
           maintainAspectRatio: false,
           resizeDelay: 1,
+          spanGaps: 1000 * 60 * 60 * 24, // 1 day
           scales: {
             ...(isHorizontal
               ? {
@@ -136,9 +148,6 @@ const Chart = ({
                       ? {}
                       : {
                           callback: (value, i) => {
-                            logDebug(`Horizontal axis callback: i = ${i};
-                              chartDatasets = ${JSON.stringify(chartDatasets)};
-                              chartDatasets[0].data = ${JSON.stringify(chartDatasets[0].data)}`);
                             //account for different data possiblities
                             const label =
                               chartDatasets[0].data[i]?.y || chartDatasets[i].data[0]?.y;
@@ -148,7 +157,7 @@ const Chart = ({
                           },
                           font: { size: 11 }, // default is 12, we want a tad smaller
                         },
-                    reverse: true,
+                    reverse: reverse,
                     stacked,
                   },
                   x: {
@@ -175,9 +184,6 @@ const Chart = ({
                       ? {}
                       : {
                           callback: (value, i) => {
-                            logDebug(`Vertical axis callback: i = ${i}; 
-                              chartDatasets = ${JSON.stringify(chartDatasets)}; 
-                              chartDatasets[0].data = ${JSON.stringify(chartDatasets[0].data)}`);
                             //account for different data possiblities - one mode per week, one mode both weeks, mixed weeks
                             const label =
                               chartDatasets[0].data[i]?.x || chartDatasets[i].data[0]?.x;
@@ -195,6 +201,12 @@ const Chart = ({
                 }),
           },
           plugins: {
+            legend: {
+              display: showLegend,
+            },
+            tooltip: {
+              enabled: enableTooltip,
+            },
             ...(lineAnnotations?.length && {
               annotation: {
                 clip: false,

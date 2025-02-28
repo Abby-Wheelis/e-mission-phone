@@ -1,14 +1,27 @@
-import { METRIC_LIST } from './MetricsTab';
+import { GroupingField, MetricName } from '../types/appConfigTypes';
 
-type MetricName = (typeof METRIC_LIST)[number];
-type LabelProps = { [k in `label_${string}`]?: number }; // label_<mode>, where <mode> could be anything
-export type DayOfMetricData = LabelProps & {
-  ts: number;
-  fmt_time: string;
-  nUsers: number;
-  local_dt: { [k: string]: any }; // TODO type datetime obj
+type TravelMetricName = 'distance' | 'duration' | 'count';
+
+// distance, duration, and count use number values in meters, seconds, and count respectively
+// response_count uses object values containing responded and not_responded counts
+// footprint uses object values containing kg_co2 and kwh values with optional _uncertain values
+export type MetricValue<T extends MetricName> = T extends TravelMetricName
+  ? number
+  : T extends 'response_count'
+    ? { responded?: number; not_responded?: number }
+    : T extends 'footprint'
+      ? { kg_co2: number; kg_co2_uncertain?: number; kwh: number; kwh_uncertain?: number }
+      : never;
+
+export type MetricEntry<T extends MetricName = MetricName> = {
+  [k in `${GroupingField}_${string}`]?: MetricValue<T>;
 };
 
+export type DayOfMetricData<T extends MetricName = MetricName> = {
+  date: string; // yyyy-mm-dd
+  nUsers: number;
+} & MetricEntry<T>;
+
 export type MetricsData = {
-  [key in MetricName]: DayOfMetricData[];
+  [key in MetricName]: DayOfMetricData<key>[];
 };

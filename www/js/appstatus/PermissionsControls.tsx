@@ -1,20 +1,19 @@
 //component to view and manage permission settings
-import React, { useContext, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { StyleSheet, ScrollView, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
 import { useTranslation } from 'react-i18next';
 import PermissionItem from './PermissionItem';
 import { refreshAllChecks } from '../usePermissionStatus';
 import ExplainPermissions from './ExplainPermissions';
-import AlertBar from '../control/AlertBar';
+import { AlertManager } from '../components/AlertBar';
 import { AppContext } from '../App';
 
 const PermissionsControls = ({ onAccept }) => {
   const { t } = useTranslation();
   const [explainVis, setExplainVis] = useState<boolean>(false);
   const { permissionStatus } = useContext(AppContext);
-  const { checkList, overallStatus, error, errorVis, setErrorVis, explanationList } =
-    permissionStatus;
+  const { checkList, overallStatus, explanationList } = permissionStatus;
 
   return (
     <>
@@ -36,12 +35,6 @@ const PermissionsControls = ({ onAccept }) => {
           {t('control.button-accept')}
         </Button>
       </View>
-
-      <AlertBar
-        visible={errorVis}
-        setVisible={setErrorVis}
-        messageKey={'Error '}
-        messageAddition={error}></AlertBar>
     </>
   );
 };

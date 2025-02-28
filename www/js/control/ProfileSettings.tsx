@@ -1,27 +1,19 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import { Modal, StyleSheet, ScrollView } from 'react-native';
-import {
-  Dialog,
-  Button,
-  useTheme,
-  Text,
-  Appbar,
-  IconButton,
-  TextInput,
-  List,
-} from 'react-native-paper';
+import { Dialog, Button, useTheme, Text, Appbar, TextInput } from 'react-native-paper';
 import { useTranslation } from 'react-i18next';
 import ExpansionSection from './ExpandMenu';
 import SettingRow from './SettingRow';
 import ControlDataTable from './ControlDataTable';
 import DemographicsSettingRow from './DemographicsSettingRow';
+import BluetoothScanSettingRow from './BluetoothScanSettingRow';
 import PopOpCode from './PopOpCode';
 import ReminderTime from './ReminderTime';
 import useAppConfig from '../useAppConfig';
-import AlertBar from './AlertBar';
+import { AlertManager } from '../components/AlertBar';
 import DataDatePicker from './DataDatePicker';
 import PrivacyPolicyModal from './PrivacyPolicyModal';
-import { sendEmail } from './emailService';
+import { sendLocalDBFile } from '../services/shareLocalDBFile';
 import { uploadFile } from './uploadService';
 import ActionMenu from '../components/ActionMenu';
 import SensedPage from './SensedPage';
@@ -34,13 +26,18 @@ import ControlCollectionHelper, {
   helperToggleLowAccuracy,
   forceTransition,
 } from './ControlCollectionHelper';
-import { resetDataAndRefresh } from '../config/dynamicConfig';
+import {
+  _cacheResourcesFetchPromise,
+  loadNewConfig,
+  resetDataAndRefresh,
+} from '../config/dynamicConfig';
 import { AppContext } from '../App';
 import { shareQR } from '../components/QrCode';
 import { storageClear } from '../plugin/storage';
 import { getAppVersion } from '../plugin/clientStats';
 import { getConsentDocument } from '../splash/startprefs';
 import { displayError, displayErrorMsg, logDebug, logWarn } from '../plugin/logger';
+// import CustomLabelSettingRow from './CustomLabelSettingRow';
 import { fetchOPCode, getSettings } from '../services/controlHelper';
 import {
   updateScheduledNotifs,
@@ -50,6 +47,7 @@ import {
 } from '../splash/notifScheduler';
 import { DateTime } from 'luxon';
 import { AppConfig } from '../types/appConfigTypes';
+import NavBar, { NavBarButton } from '../components/NavBar';
 
 //any pure functions can go outside
 const ProfileSettings = () => {
@@ -67,9 +65,7 @@ const ProfileSettings = () => {
   const [nukeSetVis, setNukeVis] = useState(false);
   const [forceStateVis, setForceStateVis] = useState(false);
   const [logoutVis, setLogoutVis] = useState(false);
-  const [invalidateSuccessVis, setInvalidateSuccessVis] = useState(false);
   const [noConsentVis, setNoConsentVis] = useState(false);
-  const [noConsentMessageVis, setNoConsentMessageVis] = useState(false);
   const [consentVis, setConsentVis] = useState(false);
   const [dateDumpVis, setDateDumpVis] = useState(false);
   const [privacyVis, setPrivacyVis] = useState(false);
@@ -131,15 +127,6 @@ const ProfileSettings = () => {
   function whenReady(newAppConfig: AppConfig) {
     const tempUiConfig = newAppConfig;
 
-    // backwards compat hack to fill in the raw_data_use for programs that don't have it
-    const default_raw_data_use = {
-      en: `to monitor the ${tempUiConfig.intro.program_or_study}, send personalized surveys or provide recommendations to participants`,
-      es: `para monitorear el ${tempUiConfig.intro.program_or_study}, enviar encuestas personalizadas o proporcionar recomendaciones a los participantes`,
-    };
-    Object.entries(tempUiConfig.intro.translated_text).forEach(([lang, val]) => {
-      val.raw_data_use = val.raw_data_use || default_raw_data_use[lang];
-    });
-
     // Backwards compat hack to fill in the `app_required` based on the
     // old-style "program_or_study"
     // remove this at the end of 2023 when all programs have been migrated over
@@ -167,14 +154,12 @@ const ProfileSettings = () => {
         });
     }
 
-    // setTemplateText(tempUiConfig.intro.translated_text);
-    // console.log("translated text is??", templateText);
     setUiConfig(tempUiConfig);
     refreshScreen();
   }
 
   async function refreshCollectSettings() {
-    console.debug('about to refreshCollectSettings, collectSettings = ', collectSettings);
+    logDebug('refreshCollectSettings: collectSettings = ' + JSON.stringify(collectSettings));
     const newCollectSettings: any = {};
 
     // // refresh collect plugin configuration
@@ -198,18 +183,16 @@ const ProfileSettings = () => {
   //ensure ui table updated when editor closes
   useEffect(() => {
     if (editCollectionVis == false) {
-      setTimeout(function () {
-        console.log('closed editor, time to refresh collect');
+      setTimeout(() => {
+        logDebug('closed editor, time to refreshCollectSettings');
         refreshCollectSettings();
       }, 1000);
     }
   }, [editCollectionVis]);
 
   async function refreshNotificationSettings() {
-    logDebug(
-      'about to refreshNotificationSettings, notificationSettings = ' +
-        JSON.stringify(notificationSettings),
-    );
+    logDebug(`about to refreshNotificationSettings, 
+      notificationSettings = ${JSON.stringify(notificationSettings)}`);
     const newNotificationSettings: any = {};
 
     if (uiConfig?.reminderSchemes) {
@@ -221,12 +204,8 @@ const ProfileSettings = () => {
       let resultList = await Promise.all(promiseList);
       const prefs = resultList[0];
       const scheduledNotifs = resultList[1];
-      logDebug(
-        'prefs and scheduled notifs\n' +
-          JSON.stringify(prefs) +
-          '\n-\n' +
-          JSON.stringify(scheduledNotifs),
-      );
+      logDebug(`prefs - scheduled notifs: 
+        ${JSON.stringify(prefs)}\n - \n${JSON.stringify(scheduledNotifs)}`);
 
       const m = DateTime.fromFormat(prefs.reminder_time_of_day, 'HH:mm');
       newNotificationSettings.prefReminderTimeVal = m.toJSDate();
@@ -235,22 +214,17 @@ const ProfileSettings = () => {
       newNotificationSettings.scheduledNotifs = scheduledNotifs;
     }
 
-    logDebug(
-      'notification settings before and after\n' +
-        JSON.stringify(notificationSettings) +
-        '\n-\n' +
-        JSON.stringify(newNotificationSettings),
-    );
+    logDebug(`notification settings before - after: 
+      ${JSON.stringify(notificationSettings)} - ${JSON.stringify(newNotificationSettings)}`);
     setNotificationSettings(newNotificationSettings);
   }
 
   async function getSyncSettings() {
-    console.log('getting sync settings');
     const newSyncSettings: any = {};
-    getHelperSyncSettings().then(function (showConfig) {
+    getHelperSyncSettings().then((showConfig) => {
       newSyncSettings.show_config = showConfig;
       setSyncSettings(newSyncSettings);
-      console.log('sync settings are ', syncSettings);
+      logDebug('sync settings are: ' + JSON.stringify(syncSettings));
     });
   }
 
@@ -261,13 +235,13 @@ const ProfileSettings = () => {
 
   async function getConnectURL() {
     getSettings().then(
-      function (response) {
+      (response) => {
         const newConnectSettings: any = {};
+        logDebug('getConnectURL: got response.connectUrl = ' + response.connectUrl);
         newConnectSettings.url = response.connectUrl;
-        console.log(response);
         setConnectSettings(newConnectSettings);
       },
-      function (error) {
+      (error) => {
         displayError(error, 'While getting connect url');
       },
     );
@@ -297,10 +271,10 @@ const ProfileSettings = () => {
     if (!uiConfig?.reminderSchemes)
       return logWarn('In updatePrefReminderTime, no reminderSchemes yet, skipping');
     if (storeNewVal) {
-      const m = DateTime.fromISO(newTime);
+      const dt = DateTime.fromJSDate(newTime);
       // store in HH:mm
       setReminderPrefs(
-        { reminder_time_of_day: m.toFormat('HH:mm') },
+        { reminder_time_of_day: dt.toFormat('HH:mm') },
         uiConfig.reminderSchemes,
         isScheduling,
         setIsScheduling,
@@ -333,23 +307,36 @@ const ProfileSettings = () => {
 
   async function toggleLowAccuracy() {
     let toggle = await helperToggleLowAccuracy();
-    setTimeout(function () {
+    setTimeout(() => {
       refreshCollectSettings();
     }, 1500);
+  }
+
+  async function refreshConfig() {
+    AlertManager.addMessage({ text: t('control.refreshing-app-config') });
+    const updated = await loadNewConfig(authSettings.opcode, appConfig?.version);
+    if (updated) {
+      // wait for resources to finish downloading before reloading
+      _cacheResourcesFetchPromise
+        .then(() => window.location.reload())
+        .catch((error) => displayError(error, 'Failed to download a resource'));
+    } else {
+      AlertManager.addMessage({ text: t('control.already-up-to-date') });
+    }
   }
 
   //Platform.OS returns "web" now, but could be used once it's fully a Native app
   //for now, use window.cordova.platformId
 
   function parseState(state) {
-    console.log('state in parse state is', state);
+    logDebug(`parseState: state = ${state}; 
+      platformId = ${window['cordova'].platformId}`);
     if (state) {
-      console.log('state in parse state exists', window['cordova'].platformId);
       if (window['cordova'].platformId == 'android') {
-        console.log('ANDROID state in parse state is', state.substring(12));
+        logDebug('platform ANDROID; parsed state will be ' + state.substring(12));
         return state.substring(12);
       } else if (window['cordova'].platformId == 'ios') {
-        console.log('IOS state in parse state is', state.substring(6));
+        logDebug('platform IOS; parsed state will be ' + state.substring(6));
         return state.substring(6);
       }
     }
@@ -357,12 +344,11 @@ const ProfileSettings = () => {
 
   async function invalidateCache() {
     window['cordova'].plugins.BEMUserCache.invalidateAllCache().then(
-      function (result) {
-        console.log('invalidate result', result);
-        setCacheResult(result);
-        setInvalidateSuccessVis(true);
+      (result) => {
+        logDebug('invalidateCache: result = ' + JSON.stringify(result));
+        AlertManager.addMessage({ text: `success -> ${result}` });
       },
-      function (error) {
+      (error) => {
         displayError(error, 'while invalidating cache, error->');
       },
     );
@@ -371,7 +357,7 @@ const ProfileSettings = () => {
   //in ProfileSettings in DevZone (above two functions are helpers)
   async function checkConsent() {
     getConsentDocument().then(
-      function (resultDoc) {
+      (resultDoc) => {
         setConsentDoc(resultDoc);
         logDebug(`In profile settings, consent doc found = ${JSON.stringify(resultDoc)}`);
         if (resultDoc == null) {
@@ -380,7 +366,7 @@ const ProfileSettings = () => {
           setConsentVis(true);
         }
       },
-      function (error) {
+      (error) => {
         displayError(error, 'Error reading consent document from cache');
       },
     );
@@ -393,7 +379,6 @@ const ProfileSettings = () => {
   //conditional creation of setting sections
 
   let logUploadSection;
-  console.debug('appConfg: support_upload:', appConfig?.profile_controls?.support_upload);
   if (appConfig?.profile_controls?.support_upload) {
     logUploadSection = (
       <SettingRow
@@ -418,7 +403,7 @@ const ProfileSettings = () => {
         <SettingRow
           textKey="control.upcoming-notifications"
           iconName="bell-check"
-          action={() => console.log('')}></SettingRow>
+          action={() => {}}></SettingRow>
         <ControlDataTable controlData={notificationSettings.scheduledNotifs}></ControlDataTable>
       </>
     );
@@ -426,23 +411,12 @@ const ProfileSettings = () => {
 
   return (
     <>
-      <Appbar.Header
-        statusBarHeight={0}
-        elevated={true}
-        style={{ height: 46, backgroundColor: colors.surface }}
-        accessibilityRole="navigation">
+      <NavBar elevated={true}>
         <Appbar.Content title={t('control.profile-tab')} />
-        <List.Item
-          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}
-          title={t('control.log-out')}
-          titleStyle={{ fontSize: 14, color: 'black', paddingEnd: 5 }}
-          accessible={true}
-          accessibilityLabel={t('control.log-out')}
-          accessibilityRole="button"
-          onPress={() => setLogoutVis(true)}
-          right={() => <List.Icon icon="logout" aria-hidden={true} />}
-        />
-      </Appbar.Header>
+        <NavBarButton icon="logout" iconSize={24} onPress={() => setLogoutVis(true)}>
+          <Text>{t('control.log-out')}</Text>
+        </NavBarButton>
+      </NavBar>
 
       <ScrollView>
         <SettingRow
@@ -452,6 +426,7 @@ const ProfileSettings = () => {
           desc={authSettings.opcode}
           descStyle={settingStyles.monoDesc}></SettingRow>
         <DemographicsSettingRow></DemographicsSettingRow>
+        {/* {appConfig?.survey_info?.['trip-labels'] == 'MULTILABEL' && <CustomLabelSettingRow />} */}
         <SettingRow
           textKey="control.view-privacy"
           iconName="eye"
@@ -475,11 +450,16 @@ const ProfileSettings = () => {
           action={() => setDateDumpVis(true)}></SettingRow>
         {logUploadSection}
         <SettingRow
-          textKey="control.email-log"
+          textKey="control.share-log"
           iconName="email"
-          action={() => sendEmail('loggerDB')}></SettingRow>
-
+          action={() => sendLocalDBFile('loggerDB')}></SettingRow>
+        <SettingRow
+          textKey="control.refresh-app-config"
+          desc={t('control.current-version', { version: appConfig?.version })}
+          iconName="cog-refresh"
+          action={refreshConfig}></SettingRow>
         <ExpansionSection sectionTitle="control.dev-zone">
+          <BluetoothScanSettingRow />
           <SettingRow
             textKey="control.refresh"
             iconName="refresh"
@@ -525,7 +505,7 @@ const ProfileSettings = () => {
         <SettingRow
           textKey="control.app-version"
           iconName="application"
-          action={() => console.log('')}
+          action={() => {}}
           desc={appVersion.current}></SettingRow>
       </ScrollView>
 
@@ -599,7 +579,7 @@ const ProfileSettings = () => {
       <PopOpCode
         visibilityValue={opCodeVis}
         setVis={setOpCodeVis}
-        tokenURL={'emission://login_token?token=' + authSettings.opcode}
+        token={authSettings.opcode}
         action={() => shareQR(authSettings.opcode)}></PopOpCode>
 
       {/* {view privacy} */}
@@ -679,16 +659,6 @@ const ProfileSettings = () => {
         minDate={
           new Date(appConfig?.intro?.start_year, appConfig?.intro?.start_month - 1, 1)
         }></DataDatePicker>
-
-      <AlertBar
-        visible={invalidateSuccessVis}
-        setVisible={setInvalidateSuccessVis}
-        messageKey="success -> "
-        messageAddition={cacheResult}></AlertBar>
-      <AlertBar
-        visible={noConsentMessageVis}
-        setVisible={setNoConsentMessageVis}
-        messageKey="general-settings.no-consent-message"></AlertBar>
 
       <SensedPage pageVis={showingSensed} setPageVis={setShowingSensed}></SensedPage>
       <LogPage pageVis={showingLog} setPageVis={setShowingLog}></LogPage>

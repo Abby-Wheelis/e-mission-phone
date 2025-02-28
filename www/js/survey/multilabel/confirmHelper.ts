@@ -1,13 +1,13 @@
 import { fetchUrlCached } from '../../services/commHelper';
 import i18next from 'i18next';
-import enJson from '../../../i18n/en.json';
 import { logDebug } from '../../plugin/logger';
 import { LabelOption, LabelOptions, MultilabelKey, InputDetails } from '../../types/labelTypes';
 import { CompositeTrip, InferredLabels, TimelineEntry } from '../../types/diaryTypes';
-import { TimelineLabelMap, UserInputMap } from '../../diary/LabelTabContext';
+import { UserInputMap } from '../../TimelineContext';
+import DEFAULT_LABEL_OPTIONS from 'e-mission-common/src/emcommon/resources/label-options.default.json';
 
 let appConfig;
-export let labelOptions: LabelOptions<MultilabelKey>;
+export let labelOptions: LabelOptions;
 export let inputDetails: InputDetails<MultilabelKey>;
 
 export async function getLabelOptions(appConfigParam?) {
@@ -19,31 +19,11 @@ export async function getLabelOptions(appConfigParam?) {
       logDebug(`label_options found in config, using dynamic label options 
         at ${appConfig.label_options}`);
       labelOptions = JSON.parse(labelOptionsJson) as LabelOptions;
+    } else {
+      throw new Error('Label options were falsy from ' + appConfig.label_options);
     }
   } else {
-    const defaultLabelOptionsURL = 'json/label-options.json.sample';
-    logDebug(`No label_options found in config, using default label options 
-      at ${defaultLabelOptionsURL}`);
-    const defaultLabelOptionsJson = await fetchUrlCached(defaultLabelOptionsURL);
-    if (defaultLabelOptionsJson) {
-      labelOptions = JSON.parse(defaultLabelOptionsJson) as LabelOptions;
-    }
-  }
-  /* fill in the translations to the 'text' fields of the labelOptions,
-    according to the current language */
-  const lang = i18next.language;
-  for (const opt in labelOptions) {
-    labelOptions[opt]?.forEach?.((o, i) => {
-      const translationKey = o.value;
-      /* If translation exists in labelOptions, use that. Otherwise, try i18next translations. */
-      const translationFromLabelOptions = labelOptions.translations?.[lang]?.[translationKey];
-      if (translationFromLabelOptions) {
-        labelOptions[opt][i].text = translationFromLabelOptions;
-      } else {
-        const i18nextKey = translationKey as keyof typeof enJson.multilabel; // cast for type safety
-        labelOptions[opt][i].text = i18next.t(`multilabel.${i18nextKey}`);
-      }
-    });
+    labelOptions = DEFAULT_LABEL_OPTIONS;
   }
   return labelOptions;
 }
@@ -91,23 +71,14 @@ export function getLabelInputDetails(appConfigParam?) {
 export function labelInputDetailsForTrip(userInputForTrip, appConfigParam?) {
   if (appConfigParam) appConfig = appConfigParam;
   if (appConfig.intro.mode_studied) {
-    if (userInputForTrip?.['MODE']?.value == appConfig.intro.mode_studied) {
-      logDebug(
-        'Found trip labeled with mode of study ' +
-          appConfig.intro.mode_studied +
-          '. Needs REPLACED_MODE',
-      );
+    if (userInputForTrip?.['MODE']?.data?.label == appConfig.intro.mode_studied) {
+      logDebug(`Found trip labeled with ${userInputForTrip?.['MODE']?.data?.label}, mode of study = ${appConfig.intro.mode_studied}.
+        Needs REPLACED_MODE`);
       return getLabelInputDetails();
     } else {
-      logDebug(
-        'Found trip not labeled with mode of study ' +
-          appConfig.intro.mode_studied +
-          ". Doesn't need REPLACED_MODE",
-      );
       return baseLabelInputDetails;
     }
   } else {
-    logDebug('No mode of study, so there is no REPLACED_MODE label option');
     return getLabelInputDetails();
   }
 }
@@ -116,26 +87,40 @@ export const getLabelInputs = () => Object.keys(getLabelInputDetails()) as Multi
 export const getBaseLabelInputs = () => Object.keys(baseLabelInputDetails) as MultilabelKey[];
 
 /** @description replace all underscores with spaces, and capitalizes the first letter of each word */
-export const labelKeyToReadable = (otherValue: string) => {
+export function labelKeyToReadable(otherValue: string) {
+  if (otherValue == otherValue.toUpperCase()) {
+    // if all caps, make lowercase
+    otherValue = otherValue.toLowerCase();
+  }
   const words = otherValue.replace(/_/g, ' ').trim().split(' ');
   if (words.length == 0) return '';
   return words.map((word) => word[0].toUpperCase() + word.slice(1)).join(' ');
-};
+}
 
 /** @description replaces all spaces with underscores, and lowercases the string */
 export const readableLabelToKey = (otherText: string) =>
   otherText.trim().replace(/ /g, '_').toLowerCase();
 
-export const getFakeEntry = (otherValue): Partial<LabelOption> | undefined => {
+export function getFakeEntry(otherValue): Partial<LabelOption> | undefined {
   if (!otherValue) return undefined;
   return {
-    text: labelKeyToReadable(otherValue),
     value: otherValue,
   };
+}
+
+export let labelTextToKeyMap: { [key: string]: string } = {};
+
+export const labelKeyToText = (labelKey: string) => {
+  const lang = i18next.resolvedLanguage || 'en';
+  const text =
+    labelOptions?.translations?.[lang]?.[labelKey] ||
+    labelOptions?.translations?.[lang]?.[labelKey] ||
+    labelKeyToReadable(labelKey);
+  labelTextToKeyMap[text] = labelKey;
+  return text;
 };
 
-export const labelKeyToRichMode = (labelKey: string) =>
-  labelOptionByValue(labelKey, 'MODE')?.text || labelKeyToReadable(labelKey);
+export const textToLabelKey = (text: string) => labelTextToKeyMap[text] || readableLabelToKey(text);
 
 /** @description e.g. manual/mode_confirm becomes mode_confirm */
 export const removeManualPrefix = (key: string) => key.split('/')[1];

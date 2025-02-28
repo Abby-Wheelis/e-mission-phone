@@ -18,16 +18,17 @@ import { getTheme } from '../../appTheme';
 import { DiaryCard, cardStyles } from './DiaryCard';
 import { useNavigation } from '@react-navigation/native';
 import { useAddressNames } from '../addressNamesHelper';
-import LabelTabContext from '../LabelTabContext';
+import TimelineContext from '../../TimelineContext';
 import useDerivedProperties from '../useDerivedProperties';
 import StartEndLocations from '../components/StartEndLocations';
 import ModesIndicator from './ModesIndicator';
 import { useGeojsonForTrip } from '../timelineHelper';
 import { CompositeTrip } from '../../types/diaryTypes';
 import { EnketoUserInputEntry } from '../../survey/enketo/enketoHelper';
+import { addStatReading } from '../../plugin/clientStats';
 
-type Props = { trip: CompositeTrip };
-const TripCard = ({ trip }: Props) => {
+type Props = { trip: CompositeTrip; isFirstInList?: boolean };
+const TripCard = ({ trip, isFirstInList }: Props) => {
   const { t } = useTranslation();
   const { width: windowWidth } = useWindowDimensions();
   const appConfig = useAppConfig();
@@ -42,19 +43,19 @@ const TripCard = ({ trip }: Props) => {
   } = useDerivedProperties(trip);
   let [tripStartDisplayName, tripEndDisplayName] = useAddressNames(trip);
   const navigation = useNavigation<any>();
-  const { labelOptions, labelFor, notesFor } = useContext(LabelTabContext);
-  const tripGeojson =
-    trip && labelOptions && useGeojsonForTrip(trip, labelOptions, labelFor(trip, 'MODE')?.value);
+  const { confirmedModeFor, notesFor } = useContext(TimelineContext);
+  const tripGeojson = trip && useGeojsonForTrip(trip, confirmedModeFor(trip));
 
   const isDraft = trip.key.includes('UNPROCESSED');
   const flavoredTheme = getTheme(isDraft ? 'draft' : undefined);
 
   function showDetail() {
     const tripId = trip._id.$oid;
+    addStatReading('view_trip_details', { tripId });
     navigation.navigate('label.details', { tripId, flavoredTheme });
   }
 
-  const mapOpts = { zoomControl: false, dragging: false };
+  const mapOpts = { attributionControl: isFirstInList, zoomControl: false, dragging: false };
   const showAddNoteButton = appConfig?.survey_info?.buttons?.['trip-notes'];
   const mapStyle = showAddNoteButton ? s.shortenedMap : s.fullHeightMap;
   return (
@@ -81,10 +82,14 @@ const TripCard = ({ trip }: Props) => {
           {/* right panel */}
           <View style={[cardStyles.panelSection, { marginTop: 0 }]}>
             {/* date and distance */}
-            <Text style={{ fontSize: 14, textAlign: 'center' }}>
-              <Text style={{ fontWeight: 'bold', textDecorationLine: 'underline' }}>
-                {displayDate}
-              </Text>
+            <Text
+              style={{
+                fontSize: 14,
+                textAlign: 'center',
+                fontWeight: 'bold',
+                textDecorationLine: 'underline',
+              }}>
+              {displayDate}
             </Text>
             <Text style={{ fontSize: 13, textAlign: 'center' }}>
               {t('diary.distance-in-time', {
@@ -113,13 +118,17 @@ const TripCard = ({ trip }: Props) => {
         </View>
         <View style={{ flex: 1, paddingBottom: showAddNoteButton ? 8 : 0 }}>
           {/* left panel */}
-          <LeafletView
-            geojson={tripGeojson}
-            opts={mapOpts}
-            /* the map should be at least as tall as it is wide
+          {tripGeojson && (
+            <LeafletView
+              geojson={tripGeojson}
+              opts={mapOpts}
+              downscaleTiles={true}
+              cacheHtml={true}
+              /* the map should be at least as tall as it is wide
                           so it doesn't look squished */
-            style={[{ minHeight: windowWidth / 2 }, mapStyle]}
-          />
+              style={[{ minHeight: windowWidth / 2 }, mapStyle]}
+            />
+          )}
           <ModesIndicator trip={trip} detectedModes={detectedModes} />
           {showAddNoteButton && (
             <View style={cardStyles.notesButton}>

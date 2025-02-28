@@ -1,181 +1,182 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { View, ScrollView, useWindowDimensions } from 'react-native';
-import { Appbar, useTheme } from 'react-native-paper';
-import NavBarButton from '../components/NavBarButton';
+import React, { useEffect, useState, useMemo, useContext } from 'react';
+import { Appbar } from 'react-native-paper';
 import { useTranslation } from 'react-i18next';
 import { DateTime } from 'luxon';
+import NavBar from '../components/NavBar';
 import { MetricsData } from './metricsTypes';
-import MetricsCard from './MetricsCard';
-import { formatForDisplay, useImperialConfig } from '../config/useImperialConfig';
-import MetricsDateSelect from './MetricsDateSelect';
-import WeeklyActiveMinutesCard from './WeeklyActiveMinutesCard';
-import { secondsToHours, secondsToMinutes } from './metricsHelper';
-import CarbonFootprintCard from './CarbonFootprintCard';
-import Carousel from '../components/Carousel';
-import DailyActiveMinutesCard from './DailyActiveMinutesCard';
-import CarbonTextCard from './CarbonTextCard';
-import ActiveMinutesTableCard from './ActiveMinutesTableCard';
-import { getAggregateData, getMetrics } from '../services/commHelper';
-import { displayError, logDebug, logWarn } from '../plugin/logger';
+import { getAggregateData } from '../services/commHelper';
+import { displayError, displayErrorMsg, logDebug } from '../plugin/logger';
 import useAppConfig from '../useAppConfig';
-import { ServerConnConfig } from '../types/appConfigTypes';
+import { AppConfig, MetricList } from '../types/appConfigTypes';
+import DateSelect from '../diary/list/DateSelect';
+import TimelineContext, { TimelineLabelMap, TimelineMap } from '../TimelineContext';
+import { metrics_summaries } from 'e-mission-common';
+import MetricsScreen from './MetricsScreen';
+import { LabelOptions } from '../types/labelTypes';
+import { useAppTheme } from '../appTheme';
+import { isoDatesDifference } from '../datetimeUtil';
 
-export const METRIC_LIST = ['duration', 'mean_speed', 'count', 'distance'] as const;
+const N_DAYS_TO_LOAD = 14; // 2 weeks
+export const DEFAULT_METRIC_LIST: MetricList = {
+  footprint: ['mode_confirm'],
+  distance: ['mode_confirm'],
+  duration: ['mode_confirm'],
+  count: ['mode_confirm'],
+};
 
-async function fetchMetricsFromServer(
-  type: 'user' | 'aggregate',
-  dateRange: DateTime[],
-  serverConnConfig: ServerConnConfig,
+async function computeUserMetrics(
+  metricList: MetricList,
+  timelineMap: TimelineMap,
+  appConfig: AppConfig,
+  timelineLabelMap: TimelineLabelMap | null,
+  labelOptions: LabelOptions,
 ) {
-  const query = {
-    freq: 'D',
-    start_time: dateRange[0].toSeconds(),
-    end_time: dateRange[1].toSeconds(),
-    metric_list: METRIC_LIST,
-    is_return_aggregate: type == 'aggregate',
-  };
-  if (type == 'user') return getMetrics('timestamp', query);
-  return getAggregateData('result/metrics/timestamp', query, serverConnConfig);
+  try {
+    const timelineValues = [...timelineMap.values()];
+    const app_config = {
+      ...appConfig,
+      ...(metricList.footprint ? { label_options: labelOptions } : {}),
+    };
+    const result = await metrics_summaries.generate_summaries(
+      { ...metricList },
+      timelineValues,
+      app_config,
+      timelineLabelMap,
+    );
+    logDebug('MetricsTab: computed userMetrics');
+    console.debug('MetricsTab: computed userMetrics', result);
+    return result as MetricsData;
+  } catch (e) {
+    displayError(e, 'Error computing user metrics');
+  }
 }
 
-function getLastTwoWeeksDtRange() {
-  const now = DateTime.now().startOf('day');
-  const start = now.minus({ days: 15 });
-  const end = now.minus({ days: 1 });
-  return [start, end];
+async function fetchAggMetrics(
+  metricList: MetricList,
+  dateRange: [string, string],
+  appConfig: AppConfig,
+  labelOptions: LabelOptions,
+) {
+  logDebug('MetricsTab: fetching agg metrics from server for dateRange ' + dateRange);
+  const query = {
+    freq: 'D',
+    start_time: dateRange[0],
+    end_time: dateRange[1],
+    metric_list: metricList,
+    is_return_aggregate: true,
+    app_config: {
+      ...(metricList.response_count ? { survey_info: appConfig.survey_info } : {}),
+      ...(metricList.footprint ? { label_options: labelOptions } : {}),
+    },
+  };
+  return getAggregateData('result/metrics/yyyy_mm_dd', query, appConfig.server)
+    .then((response) => {
+      console.debug('MetricsTab: received aggMetrics', response);
+      return response as MetricsData;
+    })
+    .catch((e) => {
+      displayError(e, 'Error fetching aggregate metrics');
+      return undefined;
+    });
 }
 
 const MetricsTab = () => {
+  const { colors } = useAppTheme();
   const appConfig = useAppConfig();
-  const { colors } = useTheme();
   const { t } = useTranslation();
-  const { getFormattedSpeed, speedSuffix, getFormattedDistance, distanceSuffix } =
-    useImperialConfig();
+  const {
+    queriedDateRange,
+    timelineMap,
+    timelineLabelMap,
+    labelOptions,
+    timelineIsLoading,
+    refreshTimeline,
+    loadMoreDays,
+    loadDateRange,
+  } = useContext(TimelineContext);
 
-  const [dateRange, setDateRange] = useState<DateTime[]>(getLastTwoWeeksDtRange);
-  const [aggMetrics, setAggMetrics] = useState<MetricsData | undefined>(undefined);
+  const metricList = appConfig?.metrics?.phone_dashboard_ui?.metric_list || DEFAULT_METRIC_LIST;
+
   const [userMetrics, setUserMetrics] = useState<MetricsData | undefined>(undefined);
+  const [aggMetrics, setAggMetrics] = useState<MetricsData | undefined>(undefined);
+  const [aggMetricsIsLoading, setAggMetricsIsLoading] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    if (!appConfig?.server) return;
-    loadMetricsForPopulation('user', dateRange);
-    loadMetricsForPopulation('aggregate', dateRange);
-  }, [dateRange, appConfig?.server]);
-
-  async function loadMetricsForPopulation(population: 'user' | 'aggregate', dateRange: DateTime[]) {
-    try {
-      logDebug(`MetricsTab: fetching metrics for population ${population}'
-        in date range ${JSON.stringify(dateRange)}`);
-      const serverResponse: any = await fetchMetricsFromServer(
-        population,
-        dateRange,
-        appConfig.server,
-      );
-      logDebug('MetricsTab: received metrics: ' + JSON.stringify(serverResponse));
-      const metrics = {};
-      const dataKey = population == 'user' ? 'user_metrics' : 'aggregate_metrics';
-      METRIC_LIST.forEach((metricName, i) => {
-        metrics[metricName] = serverResponse[dataKey][i];
-      });
-      logDebug('MetricsTab: parsed metrics: ' + JSON.stringify(metrics));
-      if (population == 'user') {
-        setUserMetrics(metrics as MetricsData);
+    if (!isInitialized && appConfig && queriedDateRange) {
+      logDebug('MetricsTab: initializing');
+      const queriedNumDays = isoDatesDifference(...queriedDateRange) + 1;
+      if (queriedNumDays < N_DAYS_TO_LOAD) {
+        logDebug('MetricsTab: not enough days loaded, trying to load more');
+        const loadingMore = loadMoreDays('past', N_DAYS_TO_LOAD - queriedNumDays);
+        if (!loadingMore) {
+          logDebug('MetricsTab: no more days can be loaded, continuing with what we have');
+          setIsInitialized(true);
+        }
       } else {
-        setAggMetrics(metrics as MetricsData);
+        setIsInitialized(true);
       }
-    } catch (e) {
-      logWarn(e + t('errors.while-loading-metrics')); // replace with displayErr
     }
-  }
+  }, [appConfig, queriedDateRange]);
+
+  useEffect(() => {
+    if (
+      !isInitialized ||
+      !appConfig ||
+      timelineIsLoading ||
+      !timelineMap ||
+      !timelineLabelMap ||
+      !labelOptions
+    )
+      return;
+    logDebug('MetricsTab: ready to compute userMetrics');
+    computeUserMetrics(metricList, timelineMap, appConfig, timelineLabelMap, labelOptions).then(
+      (result) => setUserMetrics(result),
+    );
+  }, [isInitialized, appConfig, timelineIsLoading, timelineMap, timelineLabelMap]);
+
+  useEffect(() => {
+    if (!isInitialized || !appConfig || !queriedDateRange || !labelOptions) return;
+    logDebug('MetricsTab: ready to fetch aggMetrics');
+    setAggMetricsIsLoading(true);
+    fetchAggMetrics(metricList, queriedDateRange, appConfig, labelOptions).then((response) => {
+      setAggMetricsIsLoading(false);
+      setAggMetrics(response);
+    });
+  }, [isInitialized, appConfig, queriedDateRange]);
 
   function refresh() {
-    setDateRange(getLastTwoWeeksDtRange());
+    refreshTimeline();
+    setIsInitialized(false);
+    setAggMetricsIsLoading(true);
   }
-
-  const { width: windowWidth } = useWindowDimensions();
-  const cardWidth = windowWidth * 0.88;
 
   return (
     <>
-      <Appbar.Header
-        statusBarHeight={0}
-        elevated={true}
-        style={{ height: 46, backgroundColor: colors.surface }}>
+      <NavBar
+        isLoading={Boolean(timelineIsLoading || aggMetricsIsLoading)}
+        elevated={false}
+        style={{ backgroundColor: colors.elevation.level2 }}>
         <Appbar.Content title={t('metrics.dashboard-tab')} />
-        <MetricsDateSelect dateRange={dateRange} setDateRange={setDateRange} />
-        <Appbar.Action icon="refresh" size={32} onPress={refresh} />
-      </Appbar.Header>
-      <ScrollView style={{ paddingVertical: 12 }}>
-        <Carousel cardWidth={cardWidth} cardMargin={cardMargin}>
-          <CarbonFootprintCard userMetrics={userMetrics} aggMetrics={aggMetrics} />
-          <CarbonTextCard userMetrics={userMetrics} aggMetrics={aggMetrics} />
-        </Carousel>
-        <Carousel cardWidth={cardWidth} cardMargin={cardMargin}>
-          <WeeklyActiveMinutesCard userMetrics={userMetrics} />
-          <DailyActiveMinutesCard userMetrics={userMetrics} />
-          <ActiveMinutesTableCard userMetrics={userMetrics} />
-        </Carousel>
-        <Carousel cardWidth={cardWidth} cardMargin={cardMargin}>
-          <MetricsCard
-            cardTitle={t('main-metrics.distance')}
-            userMetricsDays={userMetrics?.distance}
-            aggMetricsDays={aggMetrics?.distance}
-            axisUnits={distanceSuffix}
-            unitFormatFn={getFormattedDistance}
-          />
-          <MetricsCard
-            cardTitle={t('main-metrics.trips')}
-            userMetricsDays={userMetrics?.count}
-            aggMetricsDays={aggMetrics?.count}
-            axisUnits={t('metrics.trips')}
-            unitFormatFn={formatForDisplay}
-          />
-          <MetricsCard
-            cardTitle={t('main-metrics.duration')}
-            userMetricsDays={userMetrics?.duration}
-            aggMetricsDays={aggMetrics?.duration}
-            axisUnits={t('metrics.hours')}
-            unitFormatFn={secondsToHours}
-          />
-          {/* <MetricsCard cardTitle={t('main-metrics.mean-speed')}
-          userMetricsDays={userMetrics?.mean_speed}
-          aggMetricsDays={aggMetrics?.mean_speed}
-          axisUnits={speedSuffix}
-          unitFormatFn={getFormattedSpeed} /> */}
-        </Carousel>
-      </ScrollView>
+        <DateSelect
+          mode="range"
+          onChoose={({ startDate, endDate }) => {
+            const start = DateTime.fromJSDate(startDate).toISODate();
+            const end = DateTime.fromJSDate(endDate).toISODate();
+            if (!start || !end) return displayErrorMsg('Invalid date');
+            loadDateRange([start, end]);
+          }}
+        />
+        <Appbar.Action
+          icon="refresh"
+          size={32}
+          onPress={refresh}
+          style={{ margin: 0, marginLeft: 'auto' }}
+        />
+      </NavBar>
+      <MetricsScreen {...{ userMetrics, aggMetrics, metricList }} />
     </>
   );
-};
-
-export const cardMargin = 10;
-
-export const cardStyles: any = {
-  card: {
-    overflow: 'hidden',
-    minHeight: 300,
-  },
-  title: (colors) => ({
-    backgroundColor: colors.primary,
-    paddingHorizontal: 8,
-    minHeight: 52,
-  }),
-  titleText: (colors) => ({
-    color: colors.onPrimary,
-    fontWeight: '500',
-    textAlign: 'center',
-  }),
-  subtitleText: {
-    fontSize: 13,
-    lineHeight: 13,
-    fontWeight: '400',
-    fontStyle: 'italic',
-  },
-  content: {
-    padding: 8,
-    paddingBottom: 12,
-    flex: 1,
-  },
 };
 
 export default MetricsTab;

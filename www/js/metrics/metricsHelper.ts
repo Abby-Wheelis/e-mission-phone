@@ -1,85 +1,89 @@
 import { DateTime } from 'luxon';
-import { formatForDisplay } from '../config/useImperialConfig';
-import { DayOfMetricData } from './metricsTypes';
+import color from 'color';
+import { DayOfMetricData, MetricEntry, MetricValue } from './metricsTypes';
+import { logDebug } from '../plugin/logger';
+import { MetricName, groupingFields } from '../types/appConfigTypes';
+import { ImperialConfig } from '../config/useImperialConfig';
+import i18next from 'i18next';
+import { base_modes, metrics_summaries } from 'e-mission-common';
+import {
+  formatForDisplay,
+  formatIsoNoYear,
+  isoDatesDifference,
+  isoDateWithOffset,
+} from '../datetimeUtil';
+import { LabelOptions, RichMode } from '../types/labelTypes';
+import { labelOptions, textToLabelKey } from '../survey/multilabel/confirmHelper';
+import { UNCERTAIN_OPACITY } from '../components/charting';
 
 export function getUniqueLabelsForDays(metricDataDays: DayOfMetricData[]) {
   const uniqueLabels: string[] = [];
   metricDataDays.forEach((e) => {
     Object.keys(e).forEach((k) => {
-      if (k.startsWith('label_')) {
-        const label = k.substring(6); // remove 'label_' prefix leaving just the mode label
-        if (!uniqueLabels.includes(label)) uniqueLabels.push(label);
+      const trimmed = trimGroupingPrefix(k);
+      if (trimmed && !uniqueLabels.includes(trimmed)) {
+        uniqueLabels.push(trimmed);
       }
     });
   });
   return uniqueLabels;
 }
 
+/**
+ * @description Trims the "grouping field" prefix from a metrics key. Grouping fields are defined in appConfigTypes.ts
+ * @example removeGroupingPrefix('mode_purpose_access_recreation') => 'access_recreation'
+ * @example removeGroupingPrefix('primary_ble_sensed_mode_CAR') => 'CAR'
+ * @returns The key without the prefix (or undefined if the key didn't start with a grouping field)
+ */
+export const trimGroupingPrefix = (label: string) => {
+  for (let field of groupingFields) {
+    if (label.startsWith(field)) {
+      return label.substring(field.length + 1);
+    }
+  }
+  return '';
+};
+
 export const getLabelsForDay = (metricDataDay: DayOfMetricData) =>
   Object.keys(metricDataDay).reduce((acc, k) => {
-    if (k.startsWith('label_')) {
-      acc.push(k.substring(6)); // remove 'label_' prefix leaving just the mode label
-    }
+    const trimmed = trimGroupingPrefix(k);
+    if (trimmed) acc.push(trimmed);
     return acc;
   }, [] as string[]);
 
-export const secondsToMinutes = (seconds: number) => formatForDisplay(seconds / 60);
-
-export const secondsToHours = (seconds: number) => formatForDisplay(seconds / 3600);
+export const secondsToMinutes = (seconds: number) => seconds / 60;
+export const secondsToHours = (seconds: number) => seconds / 3600;
 
 // segments metricsDays into weeks, with the most recent week first
-export function segmentDaysByWeeks(days: DayOfMetricData[], nWeeks?: number) {
-  const weeks: DayOfMetricData[][] = [];
-  for (let i = days?.length - 1; i >= 0; i -= 7) {
-    weeks.push(days.slice(Math.max(i - 6, 0), i + 1));
+export function segmentDaysByWeeks(days: DayOfMetricData[], lastDate: string) {
+  const weeks: DayOfMetricData[][] = [[]];
+  let cutoff = isoDateWithOffset(lastDate, -7 * weeks.length);
+  for (let i = days.length - 1; i >= 0; i--) {
+    // if date is older than cutoff, start a new week
+    while (isoDatesDifference(days[i].date, cutoff) >= 0) {
+      weeks.push([]);
+      cutoff = isoDateWithOffset(lastDate, -7 * weeks.length);
+    }
+    weeks[weeks.length - 1].push(days[i]);
   }
-  if (nWeeks) return weeks.slice(0, nWeeks);
-  return weeks;
+  return weeks.map((week) => week.reverse());
 }
 
-export function formatDate(day: DayOfMetricData) {
-  const dt = DateTime.fromISO(day.fmt_time, { zone: 'utc' });
-  return dt.toLocaleString({ ...DateTime.DATE_SHORT, year: undefined });
-}
+export const formatDate = (day: DayOfMetricData) => formatIsoNoYear(day.date);
 
 export function formatDateRangeOfDays(days: DayOfMetricData[]) {
   if (!days?.length) return '';
-  const firstDayDt = DateTime.fromISO(days[0].fmt_time, { zone: 'utc' });
-  const lastDayDt = DateTime.fromISO(days[days.length - 1].fmt_time, { zone: 'utc' });
-  const firstDay = firstDayDt.toLocaleString({ ...DateTime.DATE_SHORT, year: undefined });
-  const lastDay = lastDayDt.toLocaleString({ ...DateTime.DATE_SHORT, year: undefined });
-  return `${firstDay} - ${lastDay}`;
+  const startIsoDate = days[0].date;
+  const endIsoDate = days[days.length - 1].date;
+  return formatIsoNoYear(startIsoDate, endIsoDate);
 }
 
-/* formatting data form carbon footprint calculations */
-
-//modes considered on foot for carbon calculation, expandable as needed
-const ON_FOOT_MODES = ['WALKING', 'RUNNING', 'ON_FOOT'] as const;
-
-/*
- * metric2val is a function that takes a metric entry and a field and returns
- * the appropriate value.
- * for regular data (user-specific), this will return the field value
- * for avg data (aggregate), this will return the field value/nUsers
- */
-const metricToValue = function (population: 'user' | 'aggreagte', metric, field) {
-  if (population == 'user') {
-    return metric[field];
-  } else {
-    return metric[field] / metric.nUsers;
-  }
-};
-
-//testing agains global list of what is "on foot"
-//returns true | false
-const isOnFoot = function (mode: string) {
-  for (let ped_mode in ON_FOOT_MODES) {
-    if (mode === ped_mode) {
-      return true;
-    }
-  }
-  return false;
-};
+export function getActiveModes(labelOptions: LabelOptions) {
+  return labelOptions.MODE.filter((mode) => {
+    const richMode = base_modes.get_rich_mode(mode) as RichMode;
+    return richMode.met && Object.values(richMode.met).some((met) => met?.mets || -1 > 0);
+  }).map((mode) => mode.value);
+}
 
 //from two weeks fo low and high values, calculates low and high change
 export function calculatePercentChange(pastWeekRange, previousWeekRange) {
@@ -90,124 +94,99 @@ export function calculatePercentChange(pastWeekRange, previousWeekRange) {
   return greaterLesserPct;
 }
 
-export function parseDataFromMetrics(metrics, population) {
-  console.log('Called parseDataFromMetrics on ', metrics);
-  let mode_bins: { [k: string]: [number, number, string][] } = {};
-  metrics?.forEach(function (metric) {
-    let onFootVal = 0;
+const _datesTsCache = {};
+export const tsForDayOfMetricData = (day: DayOfMetricData) => {
+  if (_datesTsCache[day.date] == undefined)
+    _datesTsCache[day.date] = DateTime.fromISO(day.date).toSeconds();
+  return _datesTsCache[day.date];
+};
 
-    for (let field in metric) {
-      /*For modes inferred from sensor data, we check if the string is all upper case 
-      by converting it to upper case and seeing if it is changed*/
-      if (field == field.toUpperCase()) {
-        /*sum all possible on foot modes: see https://github.com/e-mission/e-mission-docs/issues/422 */
-        if (isOnFoot(field)) {
-          onFootVal += metricToValue(population, metric, field);
-          field = 'ON_FOOT';
-        }
-        if (!(field in mode_bins)) {
-          mode_bins[field] = [];
-        }
-        //for all except onFoot, add to bin - could discover mult onFoot modes
-        if (field != 'ON_FOOT') {
-          mode_bins[field].push([
-            metric.ts,
-            metricToValue(population, metric, field),
-            metric.fmt_time,
-          ]);
-        }
+export const valueForFieldOnDay = (day: MetricEntry, field: string, key: string) =>
+  day[`${field}_${key}`];
+
+// [unit suffix, unit conversion function, unit display function]
+// e.g. ['hours', (seconds) => seconds/3600, (seconds) => seconds/3600 + ' hours']
+type UnitUtils = [string, (v) => number, (v) => string];
+export function getUnitUtilsForMetric(
+  metricName: MetricName,
+  imperialConfig: ImperialConfig,
+): UnitUtils {
+  const fns: { [k in MetricName]: UnitUtils } = {
+    distance: [
+      imperialConfig.distanceSuffix,
+      (x) => imperialConfig.convertDistance(x),
+      (x) => imperialConfig.getFormattedDistance(x) + ' ' + imperialConfig.distanceSuffix,
+    ],
+    duration: [
+      i18next.t('metrics.travel.hours'),
+      (v) => secondsToHours(v),
+      (v) => formatForDisplay(secondsToHours(v)) + ' ' + i18next.t('metrics.travel.hours'),
+    ],
+    count: [
+      i18next.t('metrics.travel.trips'),
+      (v) => v,
+      (v) => v + ' ' + i18next.t('metrics.travel.trips'),
+    ],
+    response_count: [
+      i18next.t('metrics.surveys.responses'),
+      (v) => v.responded || 0,
+      (v) => {
+        const responded = v.responded || 0;
+        const total = responded + (v.not_responded || 0);
+        return `${responded}/${total} ${i18next.t('metrics.surveys.responses')}`;
+      },
+    ],
+    footprint: [] as any, // TODO
+  };
+  return fns[metricName];
+}
+
+/**
+ * @param entries an array of metric entries
+ * @param metricName the metric that the values are for
+ * @returns a metric entry with fields of the same name summed across all entries
+ */
+export function aggMetricEntries<T extends MetricName>(entries: MetricEntry<T>[], metricName: T) {
+  let acc = {};
+  entries?.forEach((e) => {
+    for (let field in e) {
+      if (groupingFields.some((f) => field.startsWith(f))) {
+        acc[field] = metrics_summaries.acc_value_of_metric(metricName, acc?.[field], e[field]);
+      } else if (field == 'nUsers') {
+        acc[field] = (acc[field] || 0) + e[field];
       }
-      //this section handles user lables, assuming 'label_' prefix
-      if (field.startsWith('label_')) {
-        let actualMode = field.slice(6, field.length); //remove prefix
-        console.log('Mapped field ' + field + ' to mode ' + actualMode);
-        if (!(actualMode in mode_bins)) {
-          mode_bins[actualMode] = [];
-        }
-        mode_bins[actualMode].push([
-          metric.ts,
-          Math.round(metricToValue(population, metric, field)),
-          DateTime.fromISO(metric.fmt_time).toISO() as string,
-        ]);
-      }
-    }
-    //handle the ON_FOOT modes once all have been summed
-    if ('ON_FOOT' in mode_bins) {
-      mode_bins['ON_FOOT'].push([metric.ts, Math.round(onFootVal), metric.fmt_time]);
     }
   });
-
-  return Object.entries(mode_bins).map(([key, values]) => ({ key, values }));
+  return acc as MetricEntry<T extends `${infer U}` ? U : never>;
 }
 
-export type MetricsSummary = { key: string; values: number };
-export function generateSummaryFromData(modeMap, metric) {
-  console.log('Invoked getSummaryDataRaw on ', modeMap, 'with', metric);
-
-  let summaryMap: MetricsSummary[] = [];
-
-  for (let i = 0; i < modeMap.length; i++) {
-    let vals = 0;
-    for (let j = 0; j < modeMap[i].values.length; j++) {
-      vals += modeMap[i].values[j][1]; //2nd item of array is value
-    }
-    if (metric === 'mean_speed') {
-      // For speed, we take the avg. For other metrics we keep the sum
-      vals = vals / modeMap[i].values.length;
-    }
-    summaryMap.push({
-      key: modeMap[i].key,
-      values: Math.round(vals),
-    });
-  }
-
-  return summaryMap;
-}
-
-/*
- * We use the results to determine whether these results are from custom
- * labels or from the automatically sensed labels. Automatically sensedV
- * labels are in all caps, custom labels are prefixed by label, but have had
- * the label_prefix stripped out before this. Results should have either all
- * sensed labels or all custom labels.
+/**
+ * @param a metric entry
+ * @param metricName the metric that the values are for
+ * @returns the result of summing the values across all fields in the entry
  */
-export const isCustomLabels = function (modeMap) {
-  const isSensed = (mode) => mode == mode.toUpperCase();
-  const isCustom = (mode) => mode == mode.toLowerCase();
-  const metricSummaryChecksCustom: boolean[] = [];
-  const metricSummaryChecksSensed: boolean[] = [];
-
-  const distanceKeys = modeMap.map((e) => e.key);
-  const isSensedKeys = distanceKeys.map(isSensed);
-  const isCustomKeys = distanceKeys.map(isCustom);
-  console.log(
-    'Checking metric keys',
-    distanceKeys,
-    ' sensed ',
-    isSensedKeys,
-    ' custom ',
-    isCustomKeys,
-  );
-  const isAllCustomForMetric = isAllCustom(isSensedKeys, isCustomKeys);
-  metricSummaryChecksSensed.push(!isAllCustomForMetric);
-  metricSummaryChecksCustom.push(!!isAllCustomForMetric);
-
-  console.log('overall custom/not results for each metric = ', metricSummaryChecksCustom);
-  return isAllCustom(metricSummaryChecksSensed, metricSummaryChecksCustom);
-};
-
-const isAllCustom = function (isSensedKeys, isCustomKeys) {
-  const allSensed = isSensedKeys.reduce((a, b) => a && b, true);
-  const anySensed = isSensedKeys.reduce((a, b) => a || b, false);
-  const allCustom = isCustomKeys.reduce((a, b) => a && b, true);
-  const anyCustom = isCustomKeys.reduce((a, b) => a || b, false);
-  if (allSensed && !anyCustom) {
-    return false; // sensed, not custom
+export function sumMetricEntry<T extends MetricName>(entry: MetricEntry<T>, metricName: T) {
+  let acc;
+  for (let field in entry) {
+    if (groupingFields.some((f) => field.startsWith(f))) {
+      acc = metrics_summaries.acc_value_of_metric(metricName, acc, entry[field]);
+    }
   }
-  if (!anySensed && allCustom) {
-    return true; // custom, not sensed; false implies that the other option is true
+  if (acc && typeof acc == 'object') {
+    acc['nUsers'] = entry['nUsers'] || 1;
   }
-  // Logger.displayError("Mixed entries that combine sensed and custom labels",
-  //     "Please report to your program admin");
-  return undefined;
-};
+  return (acc || {}) as MetricValue<T extends `${infer U}` ? U : never>;
+}
+
+export const sumMetricEntries = <T extends MetricName>(days: DayOfMetricData[], metricName: T) =>
+  sumMetricEntry<T>(aggMetricEntries(days, metricName) as any, metricName);
+
+// Unlabelled data shows up as 'UNKNOWN' grey and mostly transparent
+// All other modes are colored according to their base mode
+export function getColorForModeLabel(label: string) {
+  if (label.startsWith(i18next.t('metrics.footprint.unlabeled'))) {
+    const unknownModeColor = base_modes.get_base_mode_by_key('UNKNOWN').color;
+    return color(unknownModeColor).alpha(UNCERTAIN_OPACITY).rgb().string();
+  }
+  return base_modes.get_rich_mode_for_value(textToLabelKey(label), labelOptions).color;
+}
